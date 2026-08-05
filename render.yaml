@@ -1,5 +1,6 @@
-# Render Blueprint — GitHub 저장소 연결 시 웹 서비스 + Postgres 자동 생성
-# 사용법: Render 대시보드 → "New +" → "Blueprint" → 이 저장소 선택
+# Render Blueprint — GitHub 저장소 연결 시 웹 서비스 자동 생성
+# DB는 Supabase(외부) 사용: render.yaml에는 비밀번호를 두지 않으므로
+# 생성된 서비스의 Environment 탭에서 DATABASE_URL을 직접 입력해야 합니다.
 services:
   - type: web
     name: amado-economy
@@ -8,15 +9,5 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: amado-economy-db
-          property: connectionString
       - key: SECRET_KEY
         generateValue: true
-
-databases:
-  - name: amado-economy-db
-    plan: free
-    databaseName: amado
-    user: amado

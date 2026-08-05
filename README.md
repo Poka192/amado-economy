@@ -76,15 +76,18 @@ python run.py            # → http://127.0.0.1:8000
 > - 무료 티어는 하루 대역폭 제한이 있습니다 (개인용엔 충분).
 > - 백그라운드 로또는 웹 앱이 살아있는 동안만 돌고, 꺼졌다 켜지면 접근 시 자동 보정됩니다.
 
-### B) Render (Blueprint) — 외부 Postgres
+### B) Render (웹) + Supabase (DB) — 외부 DB 유지
 
-1. **GitHub**: 이 폴더 push (`git init`, `git add .`, `git commit`, `git push`)
-2. **Render**: [render.com](https://render.com) 가입 → **New + → Blueprint** → GitHub 저장소 선택
-   - `render.yaml`이 인식되어 `amado-economy`(웹) + `amado-economy-db`(Postgres)가 자동 생성
-   - `DATABASE_URL`은 자동 연결, `SECRET_KEY`는 자동 생성됨
-3. **완료**: 배포된 URL로 접속 → 첫 부팅 시 테이블 자동 생성
+1. **GitHub**: 이 폴더 push
+2. **Supabase**: 프로젝트 생성 → **Settings → Database → Connection string → URI** 복사 (Pooler도 OK)
+3. **Render**: [render.com](https://render.com) GitHub 로그인 → **New + → Blueprint** → GitHub 저장소 선택 → **Apply**
+   - `render.yaml`이 인식되어 `amado-economy` 웹 서비스가 자동 생성 (`SECRET_KEY` 자동 생성)
+4. **DATABASE_URL 입력**: 생성된 웹 서비스 → **Environment** 탭 → **Add Environment Variable**:
+   - Key: `DATABASE_URL`
+   - Value: 2번에서 복사한 Supabase URI → **Save** (자동 재배포)
+5. **완료**: 배포된 URL로 접속 → 첫 부팅 시 Supabase에 테이블 자동 생성
 
-> **주의**: Render 무료 티어는 15분 무활동 시 절전, 무료 Postgres는 30일 후 만료됩니다.
+> **주의**: Render 무료 티어는 **15분 무활동 시 절전**됩니다. 다시 접속하면 깨어나고, 주식/부동산/로또는 자동으로 오프라인 시간을 보정합니다.
 
 ## 구조
 
