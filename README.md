@@ -28,20 +28,47 @@ python run.py            # → http://127.0.0.1:8000
 
 기본 DB는 `app.db` (SQLite)입니다.
 
-## 배포 (Render + GitHub) — 3단계
+## 배포 — 두 가지 방법
 
-GitHub는 정적 호스팅만 지원하므로, **동적 웹+DB는 Render 같은 백엔드 호스팅**이 필요합니다. 이 저장소의 `render.yaml`(Blueprint)이 웹 서비스와 Postgres를 **한 번에 자동 생성**해줍니다.
+### A) PythonAnywhere (간단, 권장) — SQLite 그대로, 항상 켜짐, DB 설정 없음
 
-1. **GitHub**: 저장소 생성 → 이 폴더 push (`git init`, `git add .`, `git commit`, `git push`)
+[pythonanywhere.com](https://www.pythonanywhere.com) 무료 계정 + 아래 6단계.
+
+1. **코드 올리기**: GitHub 저장소(`Poka192/amado-economy`)에서 다운로드 → PythonAnywhere **Files** 탭에 업로드
+   (또는 PythonAnywhere 콘솔(Bash)에서 `git clone https://github.com/Poka192/amado-economy.git`)
+2. **가상환경 + 의존성**: Bash 콘솔에서
+   ```bash
+   cd amado-economy
+   python3.12 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+3. **웹 앱 생성**: Web 탭 → **Add a new web app** → **Manual configuration** → Python **3.12**
+   - "Source code" = `/home/사용자명/amado-economy`
+   - "Virtualenv" = `/home/사용자명/amado-economy/venv`
+4. **WSGI 설정**: WSGI configuration file 열어서 전체를 아래로 교체
+   ```python
+   import sys
+   sys.path.insert(0, '/home/사용자명/amado-economy')
+   from wsgi import application   # a2wsgi ASGI→WSGI 브리지
+   ```
+5. **(선택) 정적 파일**: Web 탭 → Static files → `/static/` = `/home/사용자명/amado-economy/app/static/`
+6. **Reload** 클릭 → `https://사용자명.pythonanywhere.com` 접속
+
+> **주의**
+> - SQLite(`app.db`)는 **repo 폴더가 아닌 안전한 곳**에 두는 게 좋습니다. 원하면 `DATABASE_URL` 환경변수를 `sqlite:////home/사용자명/amado-economy/app.db`로 지정하세요.
+> - 무료 티어는 하루 대역폭 제한이 있습니다 (개인용엔 충분).
+> - 백그라운드 로또는 웹 앱이 살아있는 동안만 돌고, 꺼졌다 켜지면 접근 시 자동 보정됩니다.
+
+### B) Render (Blueprint) — 외부 Postgres
+
+1. **GitHub**: 이 폴더 push (`git init`, `git add .`, `git commit`, `git push`)
 2. **Render**: [render.com](https://render.com) 가입 → **New + → Blueprint** → GitHub 저장소 선택
    - `render.yaml`이 인식되어 `amado-economy`(웹) + `amado-economy-db`(Postgres)가 자동 생성
    - `DATABASE_URL`은 자동 연결, `SECRET_KEY`는 자동 생성됨
 3. **완료**: 배포된 URL로 접속 → 첫 부팅 시 테이블 자동 생성
 
-> **주의**
-> - Render 무료 티어는 **15분 무활동 시 절전**됩니다 (다시 접속하면 깨어남). 주식/부동산/로또는 접근 시 자동으로 오프라인 시간을 보정합니다.
-> - Render 무료 Postgres는 **30일 후 만료**됩니다. 오래 쓰려면 유료 Postgres로 바꾸거나 다른 무료 DB(Neon 등)로 `DATABASE_URL`을 교체하세요.
-> - 로컬 개발은 SQLite(`app.db`)로 동작하므로 `DATABASE_URL`이 필요 없습니다.
+> **주의**: Render 무료 티어는 15분 무활동 시 절전, 무료 Postgres는 30일 후 만료됩니다.
 
 ## 구조
 
