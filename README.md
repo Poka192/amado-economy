@@ -30,7 +30,23 @@ python run.py            # → http://127.0.0.1:8000
 
 ## 배포 — 두 가지 방법
 
-### A) PythonAnywhere (간단, 권장) — SQLite 그대로, 항상 켜짐, DB 설정 없음
+### 추천 구성: PythonAnywhere(앱) + Supabase(DB)
+
+앱은 PythonAnywhere에서, 데이터는 외부 Supabase(Postgres)에 두는 구성. SQLAlchemy라 **`DATABASE_URL` 한 줄만 바꾸면** SQLite ↔ Supabase가 자동 전환됩니다.
+
+1. **Supabase** [supabase.com](https://supabase.com) 가입 → **New project** (무료)
+   - **Settings → Database → Connection string → URI** 복사
+   - 주소가 `postgresql://postgres.xxxx:비번@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres` 형태
+   - 비밀번호는 **Database → Connect → "Reveal"** 로 확인 필요
+2. **PythonAnywhere** [pythonanywhere.com](https://pythonanywhere.com) 가입 → 아래 절차로 앱 설정
+   - Bash 콘솔: `git clone` + `venv` + `pip install -r requirements.txt`
+   - Web 탭: Source code / Virtualenv 지정, WSGI 파일에 `from wsgi import application`
+   - **환경변수 설정**: Web 탭 → "Environmental variables" → `DATABASE_URL` = Supabase 연결주소
+3. **Reload** → 배포 완료. Supabase 대시보드에서 유저/돈 데이터 조회 가능
+
+> `sslmode=require`는 코드가 자동으로 추가합니다. 로컬 개발은 여전히 SQLite로 동작합니다.
+
+### A) PythonAnywhere (간단) — SQLite 그대로, 항상 켜짐, DB 설정 없음
 
 [pythonanywhere.com](https://www.pythonanywhere.com) 무료 계정 + 아래 6단계.
 

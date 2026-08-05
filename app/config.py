@@ -7,9 +7,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 def _db_url() -> str:
     url = os.environ.get("DATABASE_URL", "")
-    # Render/Railway 등이 제공하는 postgres:// 프로토콜 호환
+    # postgres:// 프로토콜 호환 (Render/Supabase 등)
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
+    # Supabase/관리형 Postgres는 SSL 필수 — 누락 시 자동 추가
+    if url.startswith("postgresql://") and "sslmode=" not in url:
+        sep = "&" if "?" in url else "?"
+        url += f"{sep}sslmode=require"
     return url or f"sqlite:///{BASE_DIR / 'app.db'}"
 
 
