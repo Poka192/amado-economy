@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}업적{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>🏅 업적 ({{ earned_count }}/{{ total }})</h2>
+  <div class="grid">
+    {% for aid, (name, desc) in achievements.items() %}
+    <div class="stat" style="opacity:{% if aid in earned %}1{% else %}.45{% endif %}">
+      <div class="label">{% if aid in earned %}✅{% else %}🔒{% endif %} {{ name }}</div>
+      <div class="value" style="font-size:.9rem">{{ desc }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}카지노{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>🎰 카지노 <span class="muted" style="font-size:.9rem">쿨다운 5초</span></h2>
+  <div class="grid">
+    <div class="stat"><div class="label">💵 소지금</div><div class="value gold">{{ cash|fmt }}원</div></div>
+    <div class="stat"><div class="label">🎩 하이롤러</div><div class="value">Lv.{{ hr_level }} <span class="muted">(수익 +{{ hr_rate * hr_level * 100 }}%)</span></div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>🎡 룰렛 (1.5~25배)</h3>
+    <p class="muted" style="font-size:.82rem">🌠 소망력 사용 시 확률 상승</p>
+    <form method="post" action="/casino/roulette" class="form-row">
+      <input name="bet" type="number" min="1" placeholder="배팅" required>
+      <button class="btn-gold btn-sm">돌리기</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>🎲 홀짝 (1.9배)</h3>
+    <form method="post" action="/casino/odd_even" class="form-row">
+      <input name="bet" type="number" min="1" placeholder="배팅" required>
+      <select name="choice"><option>홀</option><option>짝</option></select>
+      <button class="btn-sm">배팅</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>🃏 하이로우 (1.9배)</h3>
+    <form method="post" action="/casino/high_low" class="form-row">
+      <input name="bet" type="number" min="1" placeholder="배팅" required>
+      <select name="choice"><option>하이</option><option>로우</option></select>
+      <button class="btn-sm">배팅</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>🎯 주사위 (최대 22배)</h3>
+    <form method="post" action="/casino/dice" class="form-row">
+      <input name="bet" type="number" min="1" placeholder="배팅" required>
+      <select name="target">
+        {% for t, mult in dice_payout.items() %}<option value="{{ t }}">{{ t }} ({{ mult }}배)</option>{% endfor %}
+      </select>
+      <button class="btn-sm">배팅</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>🎰 슬롯 (💎3개 → 40배)</h3>
+    <form method="post" action="/casino/slot" class="form-row">
+      <input name="bet" type="number" min="1" placeholder="배팅" required>
+      <button class="btn-sm">돌리기</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

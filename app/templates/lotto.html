@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}로또{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>🎫 로또 <span class="muted" style="font-size:.9rem">5분마다 추첨</span></h2>
+  {% if last_results %}
+  <div class="flash flash-ok">
+    {% for r in last_results %}
+      {% if r.rolled %}🎉 당첨 번호 <b>{{ "%03d" % r.drawn }}</b>! {{ r.winners|length }}명 당첨 → 각 {{ r.share|fmt }}원 지급{% else %}🎲 당첨 번호 <b>{{ "%03d" % r.drawn }}</b> (당첨자 없음) → 다음 당첨금 {{ r.jackpot|fmt }}원{% endif %}{% if not loop.last %}<br>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="grid">
+    <div class="stat"><div class="label">💰 현재 당첨금</div><div class="value gold">{{ state.jackpot|fmt }}원</div></div>
+    <div class="stat"><div class="label">🎯 최근 당첨 번호</div><div class="value">
+      {% if state.last_drawn %}<span class="ball">{{ "%03d" % state.last_drawn }}</span>
+      {% else %}<span class="muted">아직 없음</span>{% endif %}
+    </div></div>
+    <div class="stat"><div class="label">🎫 내 번호</div><div class="value">
+      {% if ticket %}<span class="ball">{{ "%03d" % ticket }}</span>
+      {% else %}<span class="muted">이번 회차 미구매</span>{% endif %}
+    </div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>티켓 구매 (1장 100,000원)</h2>
+  <p class="muted" style="font-size:.85rem">당첨 안 되면 다음 추첨 당첨금이 <b>10%씩 복리 상승</b>합니다. 번호는 001~999.</p>
+  <form method="post" action="/lotto/buy" class="form-row">
+    <input name="number" type="number" min="1" max="999" placeholder="001~999" required>
+    <button class="btn-gold">구매</button>
+  </form>
+</div>
+{% endblock %}

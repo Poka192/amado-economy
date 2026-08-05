@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}상점{% endblock %}
+{% block content %}
+<div class="grid">
+  <div class="card">
+    <h2>🛒 상점</h2>
+    {% for item in items %}
+    <div class="card" style="margin-bottom:10px">
+      <h3>{{ item[1] }} <span class="muted" style="font-size:.82rem">보유 {{ inv.get(item[0], 0) }}개</span></h3>
+      <p class="muted" style="font-size:.88rem">{{ item[2] }}</p>
+      <div class="form-row" style="margin-top:8px">
+        <form method="post" action="/shop/buy" class="form-row" style="margin:0">
+          <input type="hidden" name="item_id" value="{{ item[0] }}">
+          <input name="qty" type="number" min="1" value="1" style="width:70px">
+          <button class="btn-green btn-sm">구매 {{ item[3]|fmt }}원</button>
+        </form>
+        <form method="post" action="/shop/sell" class="form-row" style="margin:0">
+          <input type="hidden" name="item_id" value="{{ item[0] }}">
+          <input name="qty" type="number" min="1" value="1" style="width:70px">
+          <button class="btn-sm">판매 {{ item[4]|fmt }}원</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>🌠 소망력 사용</h2>
+      <p class="muted" style="font-size:.85rem">보유 <b class="gold">{{ inv.get('hope', 0) }}개</b> · 대기 <b>{{ pending_hope }}개</b> · 최대 {{ hope_max }}개</p>
+      <p class="muted" style="font-size:.85rem">다음 룰렛에 개당 실패 -0.1%, 2/3/5/10/25배 +0.02%씩</p>
+      <form method="post" action="/hope/use" class="form-row" style="margin-top:8px">
+        <input name="qty" type="number" min="1" value="1" style="width:90px">
+        <button class="btn-gold btn-sm">바치기</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🎩 하이롤러</h2>
+      <p>레벨 <b class="gold">Lv.{{ hr_level }}</b> · 도박 수익 <b>+{{ hr_rate * hr_level * 100 }}%</b></p>
+      <p class="muted" style="font-size:.85rem">다음 구매가 <b>{{ hr_price|fmt }}원</b> (기본 {{ hr_base|fmt }}원, 구매마다 2배)</p>
+      <form method="post" action="/highroller/buy" style="margin-top:8px">
+        <button class="btn-gold btn-sm">구매</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

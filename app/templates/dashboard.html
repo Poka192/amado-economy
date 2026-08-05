@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}대시보드{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>📊 내 자산 현황</h2>
+  <div class="grid">
+    <div class="stat"><div class="label">💵 소지금</div><div class="value gold">{{ worth.cash|fmt }}원</div></div>
+    <div class="stat"><div class="label">🏦 예치금</div><div class="value">{{ worth.deposit|fmt }}원</div></div>
+    <div class="stat"><div class="label">📈 주식</div><div class="value {% if worth.stock > 0 %}green{% endif %}">{{ worth.stock|fmt }}원 <span class="muted">({{ worth.stock_count }}주)</span></div></div>
+    <div class="stat"><div class="label">🏠 부동산</div><div class="value">{{ worth.property|fmt }}원 <span class="muted">({{ worth.property_count }}개)</span></div></div>
+    <div class="stat"><div class="label">🏦 대출 부채</div><div class="value red">{{ worth.loan|fmt }}원</div></div>
+    <div class="stat"><div class="label">💰 전재산</div><div class="value" style="color:var(--gold);font-size:1.7rem">{{ worth.total|fmt }}원</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>⚡ 빠른 돈벌기</h2>
+  <div class="grid">
+    <div class="stat">
+      <div class="label">🦹 구걸 (-50,000 ~ +25,000원, 10초)</div>
+      {% if beg_left > 0 %}<div class="value muted">쿨다운 {{ beg_left|int }}초</div>
+      {% else %}<form method="post" action="/beg"><button class="btn-gold">구걸하기</button></form>{% endif %}
+    </div>
+    <div class="stat">
+      <div class="label">💼 알바 (+10,000 ~ +50,000원, 5분)</div>
+      {% if alba_left > 0 %}<div class="value muted">쿨다운 {{ alba_left|int }}초</div>
+      {% else %}<form method="post" action="/alba"><button class="btn-green">알바하기</button></form>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>💸 송금</h2>
+  <form method="post" action="/transfer" class="form-row">
+    <input name="username" placeholder="대상 아이디" required>
+    <input name="amount" type="number" min="1" placeholder="금액" required>
+    <button type="submit">송금</button>
+  </form>
+</div>
+{% endblock %}

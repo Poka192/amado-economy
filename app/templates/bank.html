@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}은행{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>🏦 아마도은행</h2>
+  <div class="grid">
+    <div class="stat"><div class="label">💵 소지금</div><div class="value">{{ cash|fmt }}원</div></div>
+    <div class="stat"><div class="label">🏦 예치금</div><div class="value gold">{{ deposit|fmt }}원 <span class="muted">(이자 0.02%/분)</span></div></div>
+    <div class="stat"><div class="label">💳 대출</div><div class="value red">{{ loan_total|fmt }}원 <span class="muted">(이자 0.05%/분)</span></div></div>
+    <div class="stat"><div class="label">🔓 추가 대출 가능</div><div class="value">{{ limit|fmt }}원</div></div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>입금</h2>
+    <form method="post" action="/bank/deposit" class="form-row">
+      <input name="amount" type="number" min="1" placeholder="금액" required>
+      <button class="btn-green">예치</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>출금</h2>
+    <form method="post" action="/bank/withdraw" class="form-row">
+      <input name="amount" type="number" min="1" placeholder="금액" required>
+      <button>인출</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>대출</h2>
+    <p class="muted" style="font-size:.85rem;margin-bottom:6px">한도 = 기본 5만 + 예치금×2, 최대 100만</p>
+    <form method="post" action="/bank/loan" class="form-row">
+      <input name="amount" type="number" min="1" placeholder="금액" required>
+      <button class="btn-gold">대출</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>상환</h2>
+    <form method="post" action="/bank/repay" class="form-row">
+      <input name="amount" type="number" min="1" placeholder="빈칸=전액">
+      <button class="btn-red">상환</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

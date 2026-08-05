@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}직업{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>💼 직업 목록</h2>
+  {% if my_job %}
+    {% set job = jobs | selectattr('0', 'equalto', my_job.job_id) | first %}
+    <p>현재 직업: <b class="gold">{{ job[1] }}</b> · 레벨 <b>{{ my_job.level }}</b></p>
+    <div class="form-row" style="margin-top:10px">
+      <form method="post" action="/jobs/work">
+        {% if work_left > 0 %}<button disabled class="btn-sm">출근 쿨다운 {{ work_left|int }}초</button>
+        {% else %}<button class="btn-green">출근하기</button>{% endif %}
+      </form>
+    </div>
+  {% else %}
+    <p class="muted">직업을 선택하고 출근해서 월급을 받으세요. (5분 쿨다운)</p>
+  {% endif %}
+</div>
+
+<div class="grid">
+  {% for job in jobs %}
+  <div class="card">
+    <h3>{{ job[1] }}</h3>
+    <p class="muted" style="font-size:.88rem">{{ job[2] }}</p>
+    <p style="margin:8px 0">기본급 <b>{{ job[3]|fmt }}원</b> + 레벨보너스 <b>{{ job[5]|fmt }}원</b></p>
+    {% if my_job and my_job.job_id == job[0] %}
+      <span class="pill pill-gold">현재 직업</span>
+    {% else %}
+      <form method="post" action="/jobs/select">
+        <input type="hidden" name="job_id" value="{{ job[0] }}">
+        <button class="btn-sm">선택</button>
+      </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+# Render Blueprint — GitHub 저장소 연결 시 웹 서비스 + Postgres 자동 생성
+# 사용법: Render 대시보드 → "New +" → "Blueprint" → 이 저장소 선택
+services:
+  - type: web
+    name: amado-economy
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: amado-economy-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+
+databases:
+  - name: amado-economy-db
+    plan: free
+    databaseName: amado
+    user: amado

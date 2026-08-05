@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}주식{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>📈 주식 시장 <span class="muted" style="font-size:.9rem">24/7 상시 개장</span></h2>
+  <div class="stat" style="margin-bottom:10px"><div class="label">💵 소지금</div><div class="value gold">{{ cash|fmt }}원</div></div>
+  <table>
+    <thead><tr><th>종목</th><th>현재가</th><th>변동</th><th>섹터</th><th>배당</th><th>내 보유</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><b>{{ r.name }}</b><br><span class="muted" style="font-size:.8rem">{{ r.ticker }}</span></td>
+        <td><b>{{ r.price|fmt }}</b></td>
+        <td class="{% if r.change >= 0 %}green{% else %}red{% endif %}">{{ r.change_pct|round(2) }}%</td>
+        <td><span class="pill">{{ r.sector }}</span></td>
+        <td>{{ (r.div * 100)|round(2) }}%</td>
+        <td>
+          {% if holdings.get(r.ticker) %}
+            {{ holdings[r.ticker].quantity }}주<br><span class="muted" style="font-size:.78rem">평단 {{ holdings[r.ticker].avg_price|fmt }}</span>
+          {% else %}<span class="muted">-</span>{% endif %}
+        </td>
+        <td><a class="btn btn-sm" href="/stocks/{{ r.ticker }}">거래</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

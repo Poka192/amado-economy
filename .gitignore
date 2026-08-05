@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 데이터베이스 (로컬)
+*.db
+*.db-journal
+*.sqlite3
+
+# 환경변수
+.env
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store

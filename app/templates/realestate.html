@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}부동산{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>🏢 부동산 시장 <span class="muted" style="font-size:.9rem">보유 한도 {{ limit }}개</span></h2>
+  <div class="grid">
+    {% for t in types %}
+    <div class="stat">
+      <div class="label">{{ t[1] }}</div>
+      <div class="value gold">{{ market.get(t[0], t[2])|fmt }}원</div>
+      <div class="muted" style="font-size:.8rem">임대 {{ t[3]|fmt }}/시 · 관리비 {{ t[4]|fmt }}/시</div>
+      <form method="post" action="/realestate/buy" style="margin-top:6px">
+        <input type="hidden" name="type_id" value="{{ t[0] }}">
+        <button class="btn-sm btn-gold">구매</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% if owned %}
+<div class="card">
+  <h2>🏠 내 부동산 ({{ owned|length }}개)</h2>
+  {% for p in owned %}
+  <div class="card" style="margin-bottom:10px">
+    <h3>{{ re.PROPERTY_MAP[p.type_id][1] }} <span class="muted" style="font-size:.84rem">Lv.{{ p.level }}</span></h3>
+    <p class="muted" style="font-size:.85rem">
+      가치 <b class="gold">{{ p.value|fmt }}원</b> · 시간당 순익 <b class="green">{{ p.net|fmt }}원</b>
+    </p>
+    <div class="form-row" style="margin-top:8px">
+      <form method="post" action="/realestate/renovate">
+        <input type="hidden" name="prop_id" value="{{ p.id }}">
+        <button class="btn-sm">리모델링</button>
+      </form>
+      <form method="post" action="/realestate/sell">
+        <input type="hidden" name="prop_id" value="{{ p.id }}">
+        <button class="btn-sm btn-red">매각</button>
+      </form>
+      <form method="post" action="/realestate/list" class="form-row" style="margin:0">
+        <input type="hidden" name="prop_id" value="{{ p.id }}">
+        <input name="price" type="number" min="500000" placeholder="매물가" style="width:110px">
+        <button class="btn-sm btn-gold">매물 등록</button>
+      </form>
+      <form method="post" action="/realestate/hire" class="form-row" style="margin:0">
+        <input type="hidden" name="prop_id" value="{{ p.id }}">
+        <select name="kind"><option value="man">관리인</option><option value="guard">경비원</option><option value="promo">홍보원</option></select>
+        <button class="btn-sm">고용</button>
+      </form>
+      <form method="post" action="/realestate/fire" class="form-row" style="margin:0">
+        <input type="hidden" name="prop_id" value="{{ p.id }}">
+        <select name="kind"><option value="man">관리인</option><option value="guard">경비원</option><option value="promo">홍보원</option></select>
+        <button class="btn-sm">해고</button>
+      </form>
+    </div>
+    <p class="muted" style="font-size:.82rem">인력: 관리인 {{ p.staff_man }} · 경비원 {{ p.staff_guard }} · 홍보원 {{ p.staff_promo }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if listings %}
+<div class="card">
+  <h2>🏷️ 플레이어 매물</h2>
+  <table>
+    <thead><tr><th>종류</th><th>레벨</th><th>판매자</th><th>가격</th><th></th></tr></thead>
+    <tbody>
+      {% for li in listings %}
+      <tr>
+        <td>{{ re.PROPERTY_MAP[li.type_id][1] }}</td>
+        <td>Lv.{{ li.level }}</td>
+        <td>{{ owner_name(li.owner_id) }}</td>
+        <td>{{ li.price|fmt }}원</td>
+        <td>
+          <form method="post" action="/realestate/buy_listing">
+            <input type="hidden" name="listing_id" value="{{ li.id }}">
+            <button class="btn-sm btn-gold">구매</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

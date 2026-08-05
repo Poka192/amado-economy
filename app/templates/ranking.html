@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}랭킹{% endblock %}
+{% block content %}
+<div class="grid">
+  <div class="card">
+    <h2>💵 소지금 TOP 20</h2>
+    <table>
+      <thead><tr><th>순위</th><th>유저</th><th>소지금</th></tr></thead>
+      <tbody>
+        {% for u, bal in money_rank %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{% if user and u.id == user.id %}<b class="gold">{{ u.username }}</b>{% else %}{{ u.username }}{% endif %}</td>
+          <td>{{ bal|fmt }}원</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>💰 전재산 TOP 20</h2>
+    <table>
+      <thead><tr><th>순위</th><th>유저</th><th>전재산</th></tr></thead>
+      <tbody>
+        {% for u, total in wealth_rank %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{% if user and u.id == user.id %}<b class="gold">{{ u.username }}</b>{% else %}{{ u.username }}{% endif %}</td>
+          <td>{{ total|fmt }}원</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

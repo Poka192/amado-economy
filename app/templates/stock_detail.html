@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ info[0] }} 주식{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>{{ info[0] }} <span class="muted" style="font-size:.9rem">{{ info[1] }}</span></h2>
+  <div class="grid">
+    <div class="stat"><div class="label">현재가</div><div class="value gold">{{ price|fmt }}원</div></div>
+    <div class="stat"><div class="label">시작가</div><div class="value">{{ open|fmt }}원</div></div>
+    <div class="stat"><div class="label">보유</div><div class="value">{% if holding %}{{ holding.quantity }}주 <span class="muted">(평단 {{ holding.avg_price|fmt }})</span>{% else %}-{% endif %}</div></div>
+    <div class="stat"><div class="label">섹터</div><div class="value">{{ info[5] }}</div></div>
+  </div>
+
+  {% if history|length > 1 %}
+  <div class="spark">
+    {% set prices = history | map(attribute='price') | list %}
+    {% set lo = prices | min %}{% set hi = prices | max %}
+    {% set rng = (hi - lo) if hi > lo else 1 %}
+    {% for h in history %}
+      {% set hgt = 10 + ((h.price - lo) * 36 / rng) %}
+      <div class="bar" style="height:{{ hgt }}px" title="{{ h.price|fmt }}원"></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>🛒 시장가 매매</h3>
+    <form method="post" action="/stocks/{{ info[1] }}/buy" class="form-row">
+      <input name="qty" type="number" min="1" placeholder="수량" required>
+      <button class="btn-green btn-sm">매수</button>
+    </form>
+    <form method="post" action="/stocks/{{ info[1] }}/sell" class="form-row">
+      <input name="qty" type="number" min="1" placeholder="수량" required>
+      <button class="btn-red btn-sm">매도</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>📋 지정가 주문</h3>
+    <form method="post" action="/stocks/{{ info[1] }}/order" class="form-row">
+      <input name="qty" type="number" min="1" placeholder="수량" required>
+      <input name="price" type="number" min="1" placeholder="가격" required>
+      <select name="side"><option value="buy">매수 지정</option><option value="sell">매도 지정</option></select>
+      <button class="btn-sm">주문</button>
+    </form>
+    {% if orders %}
+    <table style="margin-top:10px">
+      <thead><tr><th>구분</th><th>수량</th><th>가격</th><th></th></tr></thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td class="{% if o.side == 'buy' %}green{% else %}red{% endif %}">{{ '매수' if o.side == 'buy' else '매도' }}</td>
+          <td>{{ o.quantity }}</td>
+          <td>{{ o.price|fmt }}</td>
+          <td>
+            <form method="post" action="/stocks/order/cancel">
+              <input type="hidden" name="order_id" value="{{ o.id }}">
+              <button class="btn-sm">취소</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h3>📰 최근 뉴스</h3>
+  {% if news %}
+  <ul style="list-style:none">
+    {% for n in news %}
+    <li style="padding:8px 0;border-bottom:1px solid var(--border)"><b>{{ n.title }}</b><br><span class="muted" style="font-size:.84rem">{{ n.body }}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">뉴스가 아직 없습니다.</p>{% endif %}
+</div>
+{% endblock %}

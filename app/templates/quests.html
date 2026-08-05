@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}일일 퀘스트{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>📋 오늘의 퀘스트 ({{ total_claimed }}/{{ quests|length }} 수령)</h2>
+  <table>
+    <thead><tr><th>퀘스트</th><th>진행도</th><th>보상</th><th></th></tr></thead>
+    <tbody>
+      {% for q in quests %}
+      <tr>
+        <td><b>{{ q.name }}</b><br><span class="muted" style="font-size:.82rem">{{ q.desc }}</span></td>
+        <td>
+          {% if q.completed %}<span class="pill pill-green">완료!</span>
+          {% else %}{{ q.progress }} / {{ q.threshold }}{% endif %}
+        </td>
+        <td>{{ q.reward|fmt }}원</td>
+        <td>
+          {% if q.completed and not q.claimed %}
+            <form method="post" action="/quests/claim">
+              <input type="hidden" name="quest_id" value="{{ q.id }}">
+              <button class="btn-green btn-sm">보상 수령</button>
+            </form>
+          {% elif q.claimed %}<span class="pill">수령 완료</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

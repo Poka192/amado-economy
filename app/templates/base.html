@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}아마도 경제{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="/dashboard">💰 아마도 경제</a>
+      <div class="nav-links">
+        {% if user %}
+          <a href="/dashboard">홈</a>
+          <a href="/bank">은행</a>
+          <a href="/jobs">직업</a>
+          <a href="/quests">퀘스트</a>
+          <a href="/shop">상점</a>
+          <a href="/casino">카지노</a>
+          <a href="/lotto">로또</a>
+          <a href="/stocks">주식</a>
+          <a href="/realestate">부동산</a>
+          <a href="/ranking">랭킹</a>
+          <a href="/achievements">업적</a>
+          <span class="nav-user">{{ user.username }}</span>
+          <a href="/logout">로그아웃</a>
+        {% else %}
+          <a href="/login">로그인</a>
+          <a href="/register">회원가입</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <main class="container">
+    {% if flash_msg %}
+      <div class="flash flash-ok">{{ flash_msg }}</div>
+    {% endif %}
+    {% if flash_err %}
+      <div class="flash flash-err">{{ flash_err }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footer">아마도 경제 웹 · 디스코드 봇과 같은 규칙</footer>
+</body>
+</html>

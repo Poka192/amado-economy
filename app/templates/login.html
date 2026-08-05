@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}로그인{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <h1>로그인</h1>
+  <form method="post" action="/login" class="auth-form">
+    <input name="username" placeholder="아이디" required autofocus>
+    <input name="password" type="password" placeholder="비밀번호" required>
+    <button type="submit">로그인</button>
+  </form>
+  <p class="muted" style="margin-top:14px;text-align:center">계정이 없나요? <a href="/register" class="gold">회원가입</a></p>
+</div>
+{% endblock %}
