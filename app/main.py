@@ -133,6 +133,9 @@ async def _page_cache_middleware(request: Request, call_next):
         if uid and _page_cache:
             for key in [k for k in _page_cache if k[1] == uid]:
                 del _page_cache[key]
+        # 랭킹 스냅샷은 모든 유저가 공유 → POST 시 무효화 (순위 최신 반영)
+        from .routers.ranking import invalidate_ranking_cache
+        invalidate_ranking_cache()
         return await call_next(request)
 
     if request.method == "GET" and _is_cacheable_path(request.url.path):

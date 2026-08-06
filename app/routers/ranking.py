@@ -1,6 +1,8 @@
 """랭킹/리더보드/업적."""
 from __future__ import annotations
 
+import time as _time
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,42 +15,44 @@ from ..database import get_db
 from ..defs import ACHIEVEMENTS
 from ..deps import optional_user, require_user
 from ..main import render
-from ..models import Money, User
+from ..models import User
 
 router = APIRouter()
 
-
-@router.get("/ranking")
-async def ranking_page(request: Request, db: Session = Depends(get_db)):
-    user = optional_user(request, db)
-
-    # 소지금 랭킹
-    money_rows = db.execute(
-        select(User, Money).join(Money, Money.user_id == User.id)
-        .order_by(Money.balance.desc()).limit(20)
-    ).all()
-    money_rank = [(u, m.balance) for u, m in money_rows]
-
-    # 재산(전재산) 랭킹 — 유저별 합산 (캐시+예치+주식+부동산-대출)
-    wealth_rows = _wealth_ranking(db)
-    return render(request, "ranking.html", user=user, money_rank=money_rank,
-                  wealth_rank=wealth_rows)
+# 랭킹은 모든 유저에게 동일한 데이터 — 전역 스냅샷 캐시(10초 TTL)로 캐시 miss 시
+# 원격 DB 8회 왕복을 1회로 절감. POST 액션 시 main.py에서 invalidate_ranking_cache() 호출.
+_rank_cache: dict[int, tuple[float, list, list]] = {}
+_RANK_TTL = 10.0
 
 
-def _wealth_ranking(db: Session, limit: int = 20) -> list:
-    """전재산 랭킹 — 테이블을 한 번씩만 로드해 메모리에서 계산.
+def invalidate_ranking_cache():
+    """POST 액션 후 순위가 최신으로 보이도록 전역 랭킹 스냅샷을 비운다."""
+    _rank_cache.clear()
 
-    기존에는 유저마다 get_money/bank_settle/보유자산별 시세 조회(N+1)로
-    수십~수백 번의 원격 DB 왕복이 발생했다. 여기선 쓰기 없이 읽기만 한다.
+
+class _Row:
+    """템플릿이 u.id/u.username만 접근하므로 그 두 필드만 갖는 경량 행."""
+
+    __slots__ = ("id", "username")
+
+    def __init__(self, uid: int, username: str):
+        self.id = uid
+        self.username = username
+
+
+def _compute_ranking(db: Session, limit: int = 20) -> tuple[list, list]:
+    """전체 랭킹 계산 — 테이블을 한 번씩만 로드해 메모리에서 계산.
+
+    (소지금 TOP, 전재산 TOP)을 (uid, username, value) 튜플로 반환.
+    기존 N+1(유저×보유자산 시세 조회)과 GET 쓰기(bank_settle/Money 삽입)를 제거.
     """
-    import time as _time
-
     from ..models import BankAccount, BankLoan, Money, Property, StockHolding
 
     users = db.execute(select(User)).scalars().all()
     if not users:
-        return []
+        return [], []
 
+    names = {u.id: u.username for u in users}
     now = _time.time()
     money_map = {m.user_id: m.balance for m in db.execute(select(Money)).scalars().all()}
     acc_map = {a.user_id: a for a in db.execute(select(BankAccount)).scalars().all()}
@@ -64,7 +68,13 @@ def _wealth_ranking(db: Session, limit: int = 20) -> list:
     prices = st_logic.get_prices(db)
     market = re_logic.get_market_prices(db)
 
-    result = []
+    # 소지금 TOP — Money row 있는 유저만 (기존 User-JOIN과 동일)
+    money_rows = [
+        (uid, names.get(uid, f"user{uid}"), bal)
+        for uid, bal in sorted(money_map.items(), key=lambda x: x[1], reverse=True)[:limit]
+    ]
+
+    wealth = []
     for u in users:
         try:
             cash = money_map.get(u.id, logic.MONEY_DEFAULT)
@@ -83,12 +93,30 @@ def _wealth_ranking(db: Session, limit: int = 20) -> list:
                 re_value += market.get(p.type_id, base) \
                     + int(base * re_logic.RENOVATE_VALUE_RATE * p.level) \
                     + int(base * re_logic.STAFF_PROMO_VALUE * p.staff_promo)
-            total = cash + deposit + stock + re_value - loan_debt
-            result.append((u, total))
+            wealth.append((u.id, u.username, cash + deposit + stock + re_value - loan_debt))
         except Exception:
             continue
-    result.sort(key=lambda x: x[1], reverse=True)
-    return result[:limit]
+    wealth.sort(key=lambda x: x[2], reverse=True)
+    return money_rows, wealth[:limit]
+
+
+@router.get("/ranking")
+async def ranking_page(request: Request, db: Session = Depends(get_db)):
+    user = optional_user(request, db)
+
+    engine_id = id(db.get_bind())
+    now = _time.time()
+    hit = _rank_cache.get(engine_id)
+    if hit and now - hit[0] < _RANK_TTL:
+        money_data, wealth_data = hit[1], hit[2]
+    else:
+        money_data, wealth_data = _compute_ranking(db)
+        _rank_cache[engine_id] = (now, money_data, wealth_data)
+
+    money_rank = [(_Row(uid, name), bal) for uid, name, bal in money_data]
+    wealth_rank = [(_Row(uid, name), total) for uid, name, total in wealth_data]
+    return render(request, "ranking.html", user=user, money_rank=money_rank,
+                  wealth_rank=wealth_rank)
 
 
 @router.get("/achievements")
