@@ -295,3 +295,50 @@ class PropertyListing(Base):
     staff_promo: Mapped[int] = mapped_column(Integer, default=0)
     price: Mapped[int] = mapped_column(Integer)
     listed_at: Mapped[float] = mapped_column(Float, default=_now)
+
+
+# ---------------------------------------------------------------------------
+# 외환 (환율/환전)
+# ---------------------------------------------------------------------------
+
+class FxRate(Base):
+    __tablename__ = "fx_rates"
+
+    code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    name: Mapped[str] = mapped_column(String(32))
+    # 1단위 외화의 원화 가치 × 100 (센트 정수) — 예) 1달러 = 1350.00원 → 135000
+    rate: Mapped[int] = mapped_column(Integer)
+    open_rate: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class FxHolding(Base):
+    __tablename__ = "fx_holdings"
+    __table_args__ = (UniqueConstraint("user_id", "code"),)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)   # 보유 외화 (센트)
+    avg_cost_cents: Mapped[int] = mapped_column(Integer, default=0)  # 1단위당 매입가 (센트)
+
+
+class FxHistory(Base):
+    __tablename__ = "fx_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(8), index=True)
+    rate: Mapped[int] = mapped_column(Integer)
+    ts: Mapped[float] = mapped_column(Float, default=_now, index=True)
+
+
+class FxTrade(Base):
+    __tablename__ = "fx_trades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code: Mapped[str] = mapped_column(String(8))
+    side: Mapped[str] = mapped_column(String(4))  # buy / sell
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    rate: Mapped[int] = mapped_column(Integer)
+    ts: Mapped[float] = mapped_column(Float, default=_now)

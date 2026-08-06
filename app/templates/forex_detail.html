@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ rate.name }} 외환{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>{{ rate.name }} <span class="muted" style="font-size:.9rem">{{ rate.code }}</span></h2>
+  <div class="grid">
+    <div class="stat"><div class="label">현재 환율</div><div class="value gold">{{ (rate.rate/100)|fmt }}원</div></div>
+    <div class="stat"><div class="label">시작 환율</div><div class="value">{{ (rate.open/100)|fmt }}원</div></div>
+    <div class="stat"><div class="label">변동</div><div class="value {% if rate.change >= 0 %}green{% else %}red{% endif %}">{{ rate.change_pct|round(2) }}%</div></div>
+    <div class="stat"><div class="label">내 보유</div><div class="value">
+      {% if holding %}{{ "%.2f"|format(holding.amount_cents/100) }} {{ rate.code }} <span class="muted">(평단 {{ (holding.avg_cost_cents/100)|fmt }}원)</span>
+      {% else %}-{% endif %}
+    </div></div>
+  </div>
+
+  {% if history|length > 1 %}
+  <div class="spark">
+    {% set rates = history | map(attribute='rate') | list %}
+    {% set lo = rates | min %}{% set hi = rates | max %}
+    {% set rng = (hi - lo) if hi > lo else 1 %}
+    {% for h in history %}
+      {% set hgt = 10 + ((h.rate - lo) * 36 / rng) %}
+      <div class="bar" style="height:{{ hgt }}px" title="{{ (h.rate/100)|fmt }}원"></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>💱 환전 (원화 → {{ rate.code }})</h3>
+    <form method="post" action="/forex/convert" class="form-row">
+      <input type="hidden" name="side" value="buy">
+      <input type="hidden" name="code" value="{{ rate.code }}">
+      <input name="amount" type="number" min="{{ min_exchange }}" step="1000" placeholder="원화 금액" required>
+      <button class="btn-green btn-sm">매수</button>
+    </form>
+    <p class="muted" style="font-size:.8rem">최소 {{ min_exchange|fmt }}원 · 수수료 1%</p>
+  </div>
+
+  <div class="card">
+    <h3>💰 매도 ({{ rate.code }} → 원화)</h3>
+    <form method="post" action="/forex/{{ rate.code }}/sell" class="form-row">
+      <input name="amount" type="number" min="0.01" step="0.01" placeholder="외화 수량 (단위)" required>
+      <button class="btn-red btn-sm">매도</button>
+    </form>
+    {% if holding %}
+    <p class="muted" style="font-size:.8rem">보유: {{ "%.2f"|format(holding.amount_cents/100) }} {{ rate.code }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

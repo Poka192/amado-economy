@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}환율/외환{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>💱 환율/외환 <span class="muted" style="font-size:.9rem">자체 시뮬레이션</span></h2>
+  <div class="stat" style="margin-bottom:10px"><div class="label">💵 소지금</div><div class="value gold">{{ cash|fmt }}원</div></div>
+  <table>
+    <thead><tr><th>통화</th><th>환율</th><th>변동</th><th>내 보유</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td><b>{{ r.name }}</b><br><span class="muted" style="font-size:.8rem">{{ r.code }}</span></td>
+        <td><b>{{ r.rate }}</b><br><span class="muted" style="font-size:.78rem">1{{ r.code }} = {{ (r.rate/100)|fmt }}원</span></td>
+        <td class="{% if r.change >= 0 %}green{% else %}red{% endif %}">{{ r.change_pct|round(2) }}%</td>
+        <td>
+          {% for h in holdings %}{% if h.code == r.code %}
+            {{ "%.2f"|format(h.units) }} {{ r.code }}<br>
+            <span class="muted" style="font-size:.78rem">평단 {{ (h.avg_cost_cents/100)|fmt }}원 · 평가 {{ h.value_krw|fmt }}원</span>
+          {% endif %}{% endfor %}
+          {% if not holdings|selectattr('code','equalto',r.code)|list %}<span class="muted">-</span>{% endif %}
+        </td>
+        <td><a class="btn btn-sm" href="/forex/{{ r.code }}">거래</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>🏦 환전소 <span class="muted" style="font-size:.9rem">수수료 1% · 최소 {{ min_exchange|fmt }}원</span></h2>
+  <form method="post" action="/forex/convert" class="form-row">
+    <select name="side">
+      <option value="buy">원화 → 외화 (매수)</option>
+      <option value="sell">외화 → 원화 (매도)</option>
+    </select>
+    <select name="code">
+      {% for r in rows %}<option value="{{ r.code }}">{{ r.code }} {{ r.name }}</option>{% endfor %}
+    </select>
+    <input type="number" name="amount" min="1000" placeholder="원화 금액 또는 외화 수량" required>
+    <button type="submit" class="btn-gold">환전</button>
+  </form>
+  <p class="muted" style="font-size:.82rem">💡 원화→외화는 <b>원화 금액</b>을, 외화→원화는 <b>외화 수량(단위)</b>을 입력하세요.</p>
+</div>
+
+{% if holdings %}
+<div class="card">
+  <h2>📊 내 외환 포트폴리오</h2>
+  <table>
+    <thead><tr><th>통화</th><th>보유</th><th>평가금액</th><th>매입원가</th><th>손익</th></tr></thead>
+    <tbody>
+      {% for h in holdings %}
+      <tr>
+        <td><b>{{ h.name }}</b> <span class="muted">{{ h.code }}</span></td>
+        <td>{{ "%.2f"|format(h.units) }} {{ h.code }}</td>
+        <td>{{ h.value_krw|fmt }}원</td>
+        <td>{{ h.cost_krw|fmt }}원</td>
+        <td class="{% if h.profit >= 0 %}green{% else %}red{% endif %}">
+          {{ h.profit|fmt }}원 ({{ h.profit_pct|round(2) }}%)
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

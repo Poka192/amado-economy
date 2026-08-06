@@ -71,6 +71,7 @@ async def _lotto_catchup():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    from . import forex_logic
     from . import stocks_logic
     from . import realestate_logic as re_logic
 
@@ -78,6 +79,7 @@ async def lifespan(app: FastAPI):
     try:
         stocks_logic.ensure_seed(db)
         re_logic.ensure_market(db)
+        forex_logic.ensure_seed(db)
         db.commit()
     finally:
         db.close()
@@ -121,6 +123,7 @@ def redirect(path: str, msg: str = "", err: str = ""):
 from .routers import auth as auth_router  # noqa: E402
 from .routers import casino as casino_router  # noqa: E402
 from .routers import economy as economy_router  # noqa: E402
+from .routers import forex as forex_router  # noqa: E402
 from .routers import lotto as lotto_router  # noqa: E402
 from .routers import ranking as ranking_router  # noqa: E402
 from .routers import realestate as realestate_router  # noqa: E402
@@ -134,6 +137,7 @@ app.include_router(casino_router.router)
 app.include_router(lotto_router.router)
 app.include_router(stocks_router.router)
 app.include_router(realestate_router.router)
+app.include_router(forex_router.router)
 app.include_router(ranking_router.router)
 
 
