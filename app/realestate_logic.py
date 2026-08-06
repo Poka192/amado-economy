@@ -91,6 +91,7 @@ def catch_up(db: Session):
     last = state.last_tick_time if state else _now()
     now = _now()
     elapsed = now - last
+    did_work = False
     if elapsed >= 600:
         missed = min(int(elapsed / 600), MAX_CATCHUP_TICKS)
         rows = {r.type_id: r for r in db.execute(select(PropertyMarket)).scalars().all()}
@@ -105,9 +106,15 @@ def catch_up(db: Session):
                 row.price = max(int(base * PRICE_MIN_RATIO),
                                 min(int(base * PRICE_MAX_RATIO), new_price))
         db.flush()
-    # 임대 정산
-    for owner in db.execute(select(Property.owner_id).distinct()).scalars().all():
-        _settle_owner(db, owner, now)
+        did_work = True
+    # 임대 정산 (보유자 있는 경우에만)
+    owners = db.execute(select(Property.owner_id).distinct()).scalars().all()
+    if owners:
+        for owner in owners:
+            _settle_owner(db, owner, now)
+        did_work = True
+    if not did_work:
+        return
     state = db.get(PropertyState, 1)
     if state is None:
         state = PropertyState(id=1)

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -103,13 +103,36 @@ async def _login_required(request: Request, exc: LoginRequired):
     return RedirectResponse("/login", status_code=303)
 
 
+_page_cache: dict[tuple, tuple[float, str]] = {}
+_PAGE_CACHE_TTL = 5.0
+_PAGE_CACHE_MAX = 256
+
+
 def render(request: Request, name: str, **ctx):
-    """템플릿 렌더 공통 (로그인 유저는 호출부에서 전달 + 메시지 주입)."""
+    """템플릿 렌더 공통 (로그인 유저는 호출부에서 전달 + 메시지 주입).
+
+    GET 페이지는 5초간 인메모리 캐시 — 원격 DB(Supabase) 교차대륙 지연을
+    줄여 반복 방문 시 즉시 응답한다. POST/오류 재렌더는 캐시하지 않는다.
+    """
     ctx["request"] = request
     ctx.setdefault("user", None)
     msg = request.query_params.get("msg", "")
     err = request.query_params.get("err", "")
     ctx["flash_msg"], ctx["flash_err"] = msg, err
+
+    if request.method == "GET":
+        uid = ctx["user"].id if ctx["user"] else 0
+        key = (name, uid, request.url.path, msg, err)
+        now = time.time()
+        cached = _page_cache.get(key)
+        if cached and now - cached[0] < _PAGE_CACHE_TTL:
+            return HTMLResponse(cached[1])
+        html = templates.TemplateResponse(request, name, ctx).body.decode()
+        if len(_page_cache) >= _PAGE_CACHE_MAX:
+            _page_cache.clear()
+        _page_cache[key] = (now, html)
+        return HTMLResponse(html)
+
     return templates.TemplateResponse(request, name, ctx)
 
 
