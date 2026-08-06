@@ -206,14 +206,31 @@ def play_slot(db: Session, uid: int, bet: int) -> dict:
             "bonus": bonus, "bet": bet, "new_balance": new_balance}
 
 
-def _house(db: Session) -> int:
-    """하우스 계좌 (시스템). 최초 생성."""
-    from .models import Money
-    row = db.get(Money, 1)
-    if row is None:
-        db.add(Money(user_id=1, balance=0))
+def _house_username() -> str:
+    """하우스 전용 계정명 (SECRET_KEY 파생 — 일반 유저가 추측/가입 불가)."""
+    import hashlib
+    from .config import SECRET_KEY
+    return "house_" + hashlib.sha256(f"casino-house:{SECRET_KEY}".encode()).hexdigest()[:8]
+
+
+def ensure_house(db: Session) -> int:
+    """하우스 계좌 보장 (부팅 + 최초 접근). 유저 id 반환."""
+    from .models import Money, User
+    from sqlalchemy import select
+    name = _house_username()
+    user = db.execute(select(User).where(User.username == name)).scalar_one_or_none()
+    if user is None:
+        user = User(username=name, password_hash="!")
+        db.add(user)
         db.flush()
-    return 1
+    if db.get(Money, user.id) is None:
+        db.add(Money(user_id=user.id, balance=0))
+        db.flush()
+    return user.id
+
+
+def _house(db: Session) -> int:
+    return ensure_house(db)
 
 
 def touch_cooldown(now: float, last: float) -> float:

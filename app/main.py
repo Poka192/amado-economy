@@ -71,12 +71,14 @@ async def _lotto_catchup():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    from . import casino_logic
     from . import forex_logic
     from . import stocks_logic
     from . import realestate_logic as re_logic
 
     db = SessionLocal()
     try:
+        casino_logic.ensure_house(db)
         stocks_logic.ensure_seed(db)
         re_logic.ensure_market(db)
         forex_logic.ensure_seed(db)
