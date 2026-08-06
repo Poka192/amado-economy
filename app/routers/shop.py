@@ -78,11 +78,12 @@ def _add_pending_hope(db: Session, uid: int, qty: int) -> int:
 @router.get("/shop")
 async def shop_page(request: Request, db: Session = Depends(get_db),
                     user: User = Depends(require_user)):
+    hr_level = get_high_roller_level(db, user.id)
     return render(request, "shop.html", user=user, items=SHOP_ITEMS,
                   inv=_inventory(db, user.id),
                   hope_price=HOPE_PRICE, hope_sell=HOPE_SELL_PRICE,
-                  hr_level=get_high_roller_level(db, user.id),
-                  hr_price=high_roller_price(get_high_roller_level(db, user.id)),
+                  hr_level=hr_level,
+                  hr_price=high_roller_price(hr_level),
                   hr_base=HIGH_ROLLER_BASE_PRICE, hr_rate=HIGH_ROLLER_PROFIT_RATE,
                   pending_hope=_get_pending_hope(db, user.id),
                   hope_max=HOPE_MAX_PER_USE)

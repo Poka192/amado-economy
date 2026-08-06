@@ -57,9 +57,18 @@ def state_set(db: Session, key: str, val: float):
 # 프로세스당 1회만 시드 존재 확인 (원격 DB 왕복 절약)
 _seeded_engines: set[int] = set()
 
+# 표시용 시세 캐시 (5초 TTL) — 페이지마다 통째로 재조회하던 것을 절감.
+# 시세는 최대 5초 구식이어도 허용(매수/매도는 직접 조회라 영향 없음). catch_up 커밋 시 무효화.
+_prices_cache: dict[int, tuple[float, dict[str, dict]]] = {}
+_PRICES_TTL = 5.0
+
 
 def _is_seeded(db: Session) -> bool:
     return id(db.get_bind()) in _seeded_engines
+
+
+def _invalidate_prices(db: Session):
+    _prices_cache.pop(id(db.get_bind()), None)
 
 
 def ensure_seed(db: Session):
@@ -77,12 +86,20 @@ def ensure_seed(db: Session):
     if state_get(db, "stock_last_tick") == 0:
         state_set(db, "stock_last_tick", _now())
     _seeded_engines.add(id(db.get_bind()))
+    _invalidate_prices(db)
 
 
 def get_prices(db: Session) -> dict[str, dict]:
     ensure_seed(db)
+    engine_id = id(db.get_bind())
+    now = _now()
+    hit = _prices_cache.get(engine_id)
+    if hit and now - hit[0] < _PRICES_TTL:
+        return hit[1]
     rows = db.execute(select(StockPrice)).scalars().all()
-    return {r.ticker: {"name": r.name, "price": r.price, "open": r.open_price} for r in rows}
+    data = {r.ticker: {"name": r.name, "price": r.price, "open": r.open_price} for r in rows}
+    _prices_cache[engine_id] = (now, data)
+    return data
 
 
 def _round_to_step(price: int) -> int:
@@ -179,6 +196,7 @@ def catch_up(db: Session):
 
     state_set(db, "stock_last_tick", now)
     db.commit()  # 시장 진행을 확정 (GET 접근 시에도 반복 실행 방지)
+    _invalidate_prices(db)  # 틱 확정 후 캐시 갱신
     return ticks
 
 

@@ -52,9 +52,17 @@ def _now() -> float:
 # 프로세스당 1회만 시장 존재 확인 (원격 DB 왕복 절약)
 _seeded_engines: set[int] = set()
 
+# 표시용 시장가 캐시 (5초 TTL) — 유저별/부동산별 시세 재조회(N+1) 절감. catch_up 커밋 시 무효화.
+_market_cache: dict[int, tuple[float, dict[str, int]]] = {}
+_MARKET_TTL = 5.0
+
 
 def _is_seeded(db: Session) -> bool:
     return id(db.get_bind()) in _seeded_engines
+
+
+def _invalidate_market(db: Session):
+    _market_cache.pop(id(db.get_bind()), None)
 
 
 def ensure_market(db: Session):
@@ -72,12 +80,20 @@ def ensure_market(db: Session):
         db.add(PropertyState(id=1, last_tick_time=_now()))
     db.flush()
     _seeded_engines.add(id(db.get_bind()))
+    _invalidate_market(db)
 
 
 def get_market_prices(db: Session) -> dict[str, int]:
     ensure_market(db)
+    engine_id = id(db.get_bind())
+    now = _now()
+    hit = _market_cache.get(engine_id)
+    if hit and now - hit[0] < _MARKET_TTL:
+        return hit[1]
     rows = db.execute(select(PropertyMarket)).scalars().all()
-    return {r.type_id: r.price for r in rows}
+    data = {r.type_id: r.price for r in rows}
+    _market_cache[engine_id] = (now, data)
+    return data
 
 
 def catch_up(db: Session):
@@ -121,6 +137,7 @@ def catch_up(db: Session):
         db.add(state)
     state.last_tick_time = now
     db.commit()
+    _invalidate_market(db)  # 틱 확정 후 캐시 갱신
 
 
 # ---------------------------------------------------------------------------

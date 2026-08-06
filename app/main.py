@@ -117,6 +117,14 @@ def _cache_uid(request: Request) -> int:
         return 0
 
 
+# 페이지 캐시에서 제외할 경로 — /static(정적)과 /ping(DB 없는 헬스체크)
+_NON_CACHE_PATHS = ("/static", "/ping")
+
+
+def _is_cacheable_path(path: str) -> bool:
+    return not path.startswith(_NON_CACHE_PATHS)
+
+
 @app.middleware("http")
 async def _page_cache_middleware(request: Request, call_next):
     if request.method == "POST":
@@ -127,7 +135,7 @@ async def _page_cache_middleware(request: Request, call_next):
                 del _page_cache[key]
         return await call_next(request)
 
-    if request.method == "GET" and not request.url.path.startswith("/static"):
+    if request.method == "GET" and _is_cacheable_path(request.url.path):
         uid = _cache_uid(request)
         key = (request.url.path, uid,
                request.query_params.get("msg", ""),
@@ -140,7 +148,7 @@ async def _page_cache_middleware(request: Request, call_next):
     response = await call_next(request)
 
     if request.method == "GET" and response.status_code == 200 \
-            and not request.url.path.startswith("/static"):
+            and _is_cacheable_path(request.url.path):
         body = b"".join([chunk async for chunk in response.body_iterator])
         uid = _cache_uid(request)
         key = (request.url.path, uid,
@@ -153,7 +161,14 @@ async def _page_cache_middleware(request: Request, call_next):
         for name, val in response.headers.items():
             if name.lower() not in ("content-length", "content-type", "content-encoding"):
                 new_resp.headers[name] = val
+        # 동적 페이지는 브라우저 휴리스틱 캐시 방지 (서버 5초 캐시는 위에서 처리)
+        new_resp.headers["Cache-Control"] = "no-store"
         return new_resp
+
+    if request.method == "GET" and request.url.path.startswith("/static") \
+            and response.status_code == 200:
+        # 정적 자산은 브라우저 캐시 (5분) — 내비게이션마다 재요청 방지
+        response.headers.setdefault("Cache-Control", "public, max-age=300")
 
     return response
 
@@ -210,3 +225,9 @@ async def root(request: Request, db: Session = Depends(get_db)):
     if user is None:
         return render(request, "index.html")
     return RedirectResponse("/dashboard", status_code=303)
+
+
+@app.get("/ping")
+async def ping():
+    """헬스체크/keep-alive — DB·템플릿 없이 즉시 응답 (Render 절전 방지용)."""
+    return Response(content="ok", media_type="text/plain")

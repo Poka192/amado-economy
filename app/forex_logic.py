@@ -70,9 +70,17 @@ def _sigma(code: str) -> float:
 # 프로세스당 1회만 시드 존재 확인 (원격 DB 왕복 절약)
 _seeded_engines: set[int] = set()
 
+# 표시용 환율 캐시 (5초 TTL) — 페이지마다 통째로 재조회 절감. catch_up 커밋 시 무효화.
+_rates_cache: dict[int, tuple[float, dict[str, dict]]] = {}
+_RATES_TTL = 5.0
+
 
 def _is_seeded(db: Session) -> bool:
     return id(db.get_bind()) in _seeded_engines
+
+
+def _invalidate_rates(db: Session):
+    _rates_cache.pop(id(db.get_bind()), None)
 
 
 def ensure_seed(db: Session):
@@ -90,6 +98,7 @@ def ensure_seed(db: Session):
     if state_get(db, "fx_last_tick") == 0:
         state_set(db, "fx_last_tick", _now())
     _seeded_engines.add(id(db.get_bind()))
+    _invalidate_rates(db)
 
 
 def _simulate_tick(rates: dict[str, FxRate]):
@@ -128,12 +137,18 @@ def catch_up(db: Session) -> int:
     db.flush()
     state_set(db, "fx_last_tick", now)
     db.commit()  # 환율 진행 확정 (GET 접근 시에도 반복 실행 방지)
+    _invalidate_rates(db)  # 틱 확정 후 캐시 갱신
     return ticks
 
 
 def get_rates(db: Session) -> dict[str, dict]:
-    """모든 통화 환율. {code: {name, rate, open, change, change_pct}}."""
+    """모든 통화 환율. {code: {name, rate, open, change, change_pct}}. (5초 TTL 캐시)"""
     ensure_seed(db)
+    engine_id = id(db.get_bind())
+    now = _now()
+    hit = _rates_cache.get(engine_id)
+    if hit and now - hit[0] < _RATES_TTL:
+        return hit[1]
     rows = db.execute(select(FxRate)).scalars().all()
     out = {}
     for r in rows:
@@ -146,6 +161,7 @@ def get_rates(db: Session) -> dict[str, dict]:
             "change": chg,
             "change_pct": pct,
         }
+    _rates_cache[engine_id] = (now, out)
     return out
 
 
@@ -175,9 +191,11 @@ def get_holdings(db: Session, uid: int) -> list[dict]:
     rows = db.execute(
         select(FxHolding).where(FxHolding.user_id == uid)
     ).scalars().all()
+    # 통화별 환율은 한 번에 로드 (보유 건마다 db.get 하던 N+1 제거)
+    rates = {r.code: r for r in db.execute(select(FxRate)).scalars().all()}
     out = []
     for h in rows:
-        rate = db.get(FxRate, h.code)
+        rate = rates.get(h.code)
         cur_rate = rate.rate if rate else 0
         # 센트 → 외화 단위 → 원화 평가 (1단위 = rate/100 원)
         units = h.amount_cents / 100.0

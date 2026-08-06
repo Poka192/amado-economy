@@ -33,8 +33,7 @@ def _net_worth(db: Session, uid: int) -> dict:
         stock_value += h.quantity * p
         stock_count += h.quantity
 
-    re_logic.ensure_market(db)
-    market = re_logic.get_market_prices(db)
+    market = re_logic.get_market_prices(db)  # 내부에서 ensure_market 수행
     re_value = 0
     re_count = 0
     from ..models import Property

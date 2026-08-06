@@ -86,6 +86,19 @@ def _elapsed_minutes(last: float, now: float) -> float:
     return min(MAX_ACCRUE_MINUTES, max(0.0, (now - last) / 60))
 
 
+def accrued_deposit(balance: int, last_interest_at: float, now: float) -> int:
+    """예치금에 이자를 더한 정산값. (쓰기 없음 — 랭킹/표시용)"""
+    minutes = _elapsed_minutes(last_interest_at, now)
+    return balance + int(balance * BANK_INTEREST_RATE * minutes)
+
+
+def accrued_loan(principal: int, interest: int, last_interest_at: float, now: float) -> tuple[int, int]:
+    """대출(원금, 이자)에 이자를 더한 정산값. (쓰기 없음)"""
+    minutes = _elapsed_minutes(last_interest_at, now)
+    debt = principal + interest
+    return principal, interest + int(debt * LOAN_INTEREST_RATE * minutes)
+
+
 def bank_settle(db: Session, uid: int, now: float | None = None) -> tuple[int, int, int]:
     """예치/대출 이자 정산. (예치금, 원금, 이자) 반환."""
     now = now or time.time()
@@ -93,8 +106,7 @@ def bank_settle(db: Session, uid: int, now: float | None = None) -> tuple[int, i
     if acc is None:
         acc = BankAccount(user_id=uid, balance=0, last_interest_at=now)
         db.add(acc)
-    minutes = _elapsed_minutes(acc.last_interest_at, now)
-    new_balance = acc.balance + int(acc.balance * BANK_INTEREST_RATE * minutes)
+    new_balance = accrued_deposit(acc.balance, acc.last_interest_at, now)
     acc.balance = new_balance
     acc.last_interest_at = now
 
@@ -102,12 +114,11 @@ def bank_settle(db: Session, uid: int, now: float | None = None) -> tuple[int, i
     if loan is None:
         db.flush()
         return new_balance, 0, 0
-    minutes = _elapsed_minutes(loan.last_interest_at, now)
-    debt = loan.principal + loan.interest
-    loan.interest += int(debt * LOAN_INTEREST_RATE * minutes)
+    principal, interest = accrued_loan(loan.principal, loan.interest, loan.last_interest_at, now)
+    loan.interest = interest
     loan.last_interest_at = now
     db.flush()
-    return new_balance, loan.principal, loan.interest
+    return new_balance, principal, interest
 
 
 def loan_limit(deposit: int, debt: int) -> int:
