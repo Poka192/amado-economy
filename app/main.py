@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -98,41 +98,78 @@ app = FastAPI(title="아마도 경제", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+# GET 페이지 5초 캐시 — 원격 DB(교차대륙) 지연을 피해 반복 방문 시 즉시 응답.
+# 라우트 DB 작업까지 건너뛰기 위해 응답 레벨에서 캐시한다.
+_page_cache: dict[tuple, tuple[float, bytes]] = {}
+_PAGE_CACHE_TTL = 5.0
+_PAGE_CACHE_MAX = 512
+
+
+def _cache_uid(request: Request) -> int:
+    from .deps import SESSION_COOKIE
+    from .security import read_session_token
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return 0
+    try:
+        return read_session_token(token) or 0
+    except Exception:
+        return 0
+
+
+@app.middleware("http")
+async def _page_cache_middleware(request: Request, call_next):
+    if request.method == "POST":
+        # 액션 후엔 해당 유저의 캐시 무효화 (최신 데이터 반영)
+        uid = _cache_uid(request)
+        if uid and _page_cache:
+            for key in [k for k in _page_cache if k[1] == uid]:
+                del _page_cache[key]
+        return await call_next(request)
+
+    if request.method == "GET" and not request.url.path.startswith("/static"):
+        uid = _cache_uid(request)
+        key = (request.url.path, uid,
+               request.query_params.get("msg", ""),
+               request.query_params.get("err", ""))
+        now = time.time()
+        hit = _page_cache.get(key)
+        if hit and now - hit[0] < _PAGE_CACHE_TTL:
+            return Response(content=hit[1], media_type="text/html")
+
+    response = await call_next(request)
+
+    if request.method == "GET" and response.status_code == 200 \
+            and not request.url.path.startswith("/static"):
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        uid = _cache_uid(request)
+        key = (request.url.path, uid,
+               request.query_params.get("msg", ""),
+               request.query_params.get("err", ""))
+        if len(_page_cache) >= _PAGE_CACHE_MAX:
+            _page_cache.clear()
+        _page_cache[key] = (time.time(), body)
+        new_resp = Response(content=body, media_type="text/html")
+        for name, val in response.headers.items():
+            if name.lower() not in ("content-length", "content-type", "content-encoding"):
+                new_resp.headers[name] = val
+        return new_resp
+
+    return response
+
+
 @app.exception_handler(LoginRequired)
 async def _login_required(request: Request, exc: LoginRequired):
     return RedirectResponse("/login", status_code=303)
 
 
-_page_cache: dict[tuple, tuple[float, str]] = {}
-_PAGE_CACHE_TTL = 5.0
-_PAGE_CACHE_MAX = 256
-
-
 def render(request: Request, name: str, **ctx):
-    """템플릿 렌더 공통 (로그인 유저는 호출부에서 전달 + 메시지 주입).
-
-    GET 페이지는 5초간 인메모리 캐시 — 원격 DB(Supabase) 교차대륙 지연을
-    줄여 반복 방문 시 즉시 응답한다. POST/오류 재렌더는 캐시하지 않는다.
-    """
+    """템플릿 렌더 공통 (로그인 유저는 호출부에서 전달 + 메시지 주입)."""
     ctx["request"] = request
     ctx.setdefault("user", None)
     msg = request.query_params.get("msg", "")
     err = request.query_params.get("err", "")
     ctx["flash_msg"], ctx["flash_err"] = msg, err
-
-    if request.method == "GET":
-        uid = ctx["user"].id if ctx["user"] else 0
-        key = (name, uid, request.url.path, msg, err)
-        now = time.time()
-        cached = _page_cache.get(key)
-        if cached and now - cached[0] < _PAGE_CACHE_TTL:
-            return HTMLResponse(cached[1])
-        html = templates.TemplateResponse(request, name, ctx).body.decode()
-        if len(_page_cache) >= _PAGE_CACHE_MAX:
-            _page_cache.clear()
-        _page_cache[key] = (now, html)
-        return HTMLResponse(html)
-
     return templates.TemplateResponse(request, name, ctx)
 
 
