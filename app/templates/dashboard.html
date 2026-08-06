@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}대시보드{% endblock %}
 {% block content %}
+<div class="page-head">
+  <h1>안녕하세요, <span style="color:var(--gold-2);font-family:var(--serif)">{{ user.username }}</span>님</h1>
+  <p style="color:var(--muted);margin-top:4px;font-size:.95rem">오늘도 꾸준히 — 자산이 자라는 중입니다 📈</p>
+</div>
 <div class="card">
   <h2>📊 내 자산 현황</h2>
   <div class="grid">
