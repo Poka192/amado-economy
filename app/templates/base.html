@@ -10,45 +10,96 @@
   <script>document.documentElement.className += ' js';</script>
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-inner">
-      <a class="brand" href="{% if user %}/dashboard{% else %}/{% endif %}"><span class="coin">🪙</span>아마도 경제</a>
-      <div class="nav-links">
-        {% if user %}
-          {% set path = request.url.path %}
-          <a href="/dashboard" {% if path == '/dashboard' %}class="active"{% endif %}>홈</a>
-          <a href="/bank" {% if path.startswith('/bank') %}class="active"{% endif %}>은행</a>
-          <a href="/jobs" {% if path.startswith('/jobs') %}class="active"{% endif %}>직업</a>
-          <a href="/quests" {% if path.startswith('/quests') %}class="active"{% endif %}>퀘스트</a>
-          <a href="/shop" {% if path.startswith('/shop') %}class="active"{% endif %}>상점</a>
-          <a href="/casino" {% if path.startswith('/casino') %}class="active"{% endif %}>카지노</a>
-          <a href="/lotto" {% if path.startswith('/lotto') %}class="active"{% endif %}>로또</a>
-          <a href="/stocks" {% if path.startswith('/stocks') %}class="active"{% endif %}>주식</a>
-          <a href="/forex" {% if path.startswith('/forex') %}class="active"{% endif %}>환율</a>
-          <a href="/realestate" {% if path.startswith('/realestate') %}class="active"{% endif %}>부동산</a>
-          <a href="/ranking" {% if path.startswith('/ranking') %}class="active"{% endif %}>랭킹</a>
-          <a href="/achievements" {% if path.startswith('/achievements') %}class="active"{% endif %}>업적</a>
-          <span class="nav-user"><span class="avatar">{{ user.username[:1]|upper if user.username else '?' }}</span>{{ user.username }}</span>
-          <a href="/logout">로그아웃</a>
-        {% else %}
-          <a href="/login" {% if request.url.path.startswith('/login') %}class="active"{% endif %}>로그인</a>
-          <a href="/register" {% if request.url.path.startswith('/register') %}class="active"{% endif %}>회원가입</a>
-        {% endif %}
-      </div>
+  <!-- CSS-only 햄버거: 체크박스가 sidebar 토글 상태를 관리 -->
+  <input type="checkbox" id="navToggle" class="nav-toggle-input">
+
+  <!-- 사이드바 -->
+  {% set p = request.url.path %}
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <a class="sidebar-brand" href="{% if user %}/dashboard{% else %}/{% endif %}">
+        <span class="sidebar-logo">🪙</span>
+        <span class="sidebar-logo-text">아마도 경제</span>
+      </a>
     </div>
-  </nav>
 
-  <main class="container">
-    {% if flash_msg %}
-      <div class="flash flash-ok">✅ {{ flash_msg }}</div>
+    {% if user %}
+      <nav class="sidebar-nav">
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">메인</div>
+          <a href="/dashboard" class="{% if p == '/dashboard' %}active{% endif %}"><span class="nav-icon">📊</span>대시보드</a>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">금융</div>
+          <a href="/bank" class="{% if p.startswith('/bank') %}active{% endif %}"><span class="nav-icon">🏦</span>은행</a>
+          <a href="/jobs" class="{% if p.startswith('/jobs') %}active{% endif %}"><span class="nav-icon">💼</span>직업</a>
+          <a href="/quests" class="{% if p.startswith('/quests') %}active{% endif %}"><span class="nav-icon">📋</span>퀘스트</a>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">투자</div>
+          <a href="/stocks" class="{% if p.startswith('/stocks') %}active{% endif %}"><span class="nav-icon">📈</span>주식</a>
+          <a href="/forex" class="{% if p.startswith('/forex') %}active{% endif %}"><span class="nav-icon">💱</span>환율</a>
+          <a href="/realestate" class="{% if p.startswith('/realestate') %}active{% endif %}"><span class="nav-icon">🏢</span>부동산</a>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">오락</div>
+          <a href="/casino" class="{% if p.startswith('/casino') %}active{% endif %}"><span class="nav-icon">🎰</span>카지노</a>
+          <a href="/lotto" class="{% if p.startswith('/lotto') %}active{% endif %}"><span class="nav-icon">🎫</span>로또</a>
+          <a href="/shop" class="{% if p.startswith('/shop') %}active{% endif %}"><span class="nav-icon">🛒</span>상점</a>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">기타</div>
+          <a href="/ranking" class="{% if p.startswith('/ranking') %}active{% endif %}"><span class="nav-icon">🏆</span>랭킹</a>
+          <a href="/achievements" class="{% if p.startswith('/achievements') %}active{% endif %}"><span class="nav-icon">🏅</span>업적</a>
+        </div>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="sidebar-user">
+          <span class="sidebar-avatar">{{ user.username[:1]|upper if user.username else '?' }}</span>
+          <span class="sidebar-username">{{ user.username }}</span>
+        </div>
+        <a href="/logout" class="sidebar-logout">로그아웃 →</a>
+      </div>
+    {% else %}
+      <nav class="sidebar-nav">
+        <div class="sidebar-section">
+          <a href="/login" class="{% if p.startswith('/login') %}active{% endif %}"><span class="nav-icon">🔑</span>로그인</a>
+          <a href="/register" class="{% if p.startswith('/register') %}active{% endif %}"><span class="nav-icon">✏️</span>회원가입</a>
+        </div>
+      </nav>
+      <div class="sidebar-foot">
+        <p class="muted" style="font-size:.78rem">아마도 경제에 오신 것을 환영합니다</p>
+      </div>
     {% endif %}
-    {% if flash_err %}
-      <div class="flash flash-err">⚠️ {{ flash_err }}</div>
-    {% endif %}
-    {% block content %}{% endblock %}
+  </aside>
+
+  <!-- 모바일 오버레이 (사이드바 배경 클릭 시 닫힘) -->
+  <label for="navToggle" class="sidebar-overlay"></label>
+
+  <!-- 메인 콘텐츠 -->
+  <main class="main">
+    <!-- 모바일 상단 바 -->
+    <div class="mobile-bar">
+      <label for="navToggle" class="hamburger" aria-label="메뉴">
+        <span></span><span></span><span></span>
+      </label>
+      <a class="mobile-brand" href="{% if user %}/dashboard{% else %}/{% endif %}">🪙 아마도 경제</a>
+      {% if user %}
+        <span class="mobile-avatar">{{ user.username[:1]|upper if user.username else '?' }}</span>
+      {% endif %}
+    </div>
+
+    <div class="page-content">
+      {% if flash_msg %}
+        <div class="flash flash-ok">✅ {{ flash_msg }}</div>
+      {% endif %}
+      {% if flash_err %}
+        <div class="flash flash-err">⚠️ {{ flash_err }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
   </main>
-
-  <footer class="footer">아마도 경제 웹 · 디스코드 봇과 같은 규칙 · 지금은 성장의 시간 🏦</footer>
 
   <script src="/static/app.js" defer></script>
 </body>
