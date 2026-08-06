@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from . import lotto_logic
 from .database import Base, SessionLocal, engine, get_db
-from .deps import LoginRequired
+from .deps import AdminRequired, LoginRequired
 from .defs import LOTTO_DRAW_INTERVAL
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -68,6 +68,27 @@ async def _lotto_catchup():
         db.close()
 
 
+def _migrate_and_promote_admin(db: Session):
+    """users.is_admin 컬럼 마이그레이션 + 'admin' 계정 자동 승격.
+
+    create_all은 기존 테이블에 열을 추가하지 못하므로,
+    운영 DB(Supabase/Postgres) 재배포 시 ALTER로 컬럼을 보장한다.
+    """
+    from sqlalchemy import inspect, select, text
+    from .models import User
+
+    inspector = inspect(engine)
+    if "users" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("users")}
+        if "is_admin" not in cols:
+            db.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE"))
+            db.commit()
+    admin = db.execute(select(User).where(User.username == "admin")).scalar_one_or_none()
+    if admin is not None and not admin.is_admin:
+        admin.is_admin = True
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
@@ -78,6 +99,7 @@ async def lifespan(app: FastAPI):
 
     db = SessionLocal()
     try:
+        _migrate_and_promote_admin(db)
         casino_logic.ensure_house(db)
         stocks_logic.ensure_seed(db)
         re_logic.ensure_market(db)
@@ -117,8 +139,8 @@ def _cache_uid(request: Request) -> int:
         return 0
 
 
-# 페이지 캐시에서 제외할 경로 — /static(정적)과 /ping(DB 없는 헬스체크)
-_NON_CACHE_PATHS = ("/static", "/ping")
+# 페이지 캐시에서 제외할 경로 — /static(정적), /ping(헬스체크), /admin(실시간 관리자 페이지)
+_NON_CACHE_PATHS = ("/static", "/ping", "/admin")
 
 
 def _is_cacheable_path(path: str) -> bool:
@@ -181,6 +203,11 @@ async def _login_required(request: Request, exc: LoginRequired):
     return RedirectResponse("/login", status_code=303)
 
 
+@app.exception_handler(AdminRequired)
+async def _admin_required(request: Request, exc: AdminRequired):
+    return RedirectResponse("/dashboard?err=관리자 권한이 필요합니다.", status_code=303)
+
+
 def render(request: Request, name: str, **ctx):
     """템플릿 렌더 공통 (로그인 유저는 호출부에서 전달 + 메시지 주입)."""
     ctx["request"] = request
@@ -200,6 +227,7 @@ def redirect(path: str, msg: str = "", err: str = ""):
 
 
 # 라우터 등록
+from .routers import admin as admin_router  # noqa: E402
 from .routers import auth as auth_router  # noqa: E402
 from .routers import casino as casino_router  # noqa: E402
 from .routers import economy as economy_router  # noqa: E402
@@ -210,6 +238,7 @@ from .routers import realestate as realestate_router  # noqa: E402
 from .routers import shop as shop_router  # noqa: E402
 from .routers import stocks as stocks_router  # noqa: E402
 
+app.include_router(admin_router.router)
 app.include_router(auth_router.router)
 app.include_router(economy_router.router)
 app.include_router(shop_router.router)

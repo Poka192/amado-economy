@@ -83,6 +83,15 @@
       </div>
     {% endif %}
 
+    {% if user and user.is_admin %}
+    <nav class="sidebar-nav admin-nav">
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">관리자</div>
+        <a href="/admin" class="{% if request.url.path.startswith('/admin') %}active{% endif %}"><span class="nav-icon">🛡️</span>관리자 패널</a>
+      </div>
+    </nav>
+    {% endif %}
+
     <!-- 테마 스위처 (공통) -->
     <div class="theme-block">
       <div class="sidebar-section-title">테마</div>

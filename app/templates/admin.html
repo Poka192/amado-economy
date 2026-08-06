@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}관리자 패널{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>🛡️ 관리자 패널</h1>
+  <p>유저 · 경제 · 로또 제어 — 모든 액션은 기록되지 않으니 신중하게.</p>
+</div>
+
+<div class="grid">
+  <div class="stat"><div class="label">👥 총 유저</div><div class="value">{{ summaries.users }}</div></div>
+  <div class="stat"><div class="label">💰 유통 소지금</div><div class="value gold">{{ summaries.cash|fmt }}원</div></div>
+  <div class="stat"><div class="label">🏦 총 예치금</div><div class="value">{{ summaries.deposit|fmt }}원</div></div>
+  <div class="stat"><div class="label">💳 총 대출</div><div class="value red">{{ summaries.loan|fmt }}원</div></div>
+  <div class="stat"><div class="label">🛡️ 관리자</div><div class="value">{{ summaries.admins }}명</div></div>
+</div>
+
+<div class="card">
+  <h2>🔍 유저 검색</h2>
+  <form method="get" action="/admin" class="form-row">
+    <input name="q" value="{{ q }}" placeholder="아이디 입력" required autofocus>
+    <button class="btn-gold">검색</button>
+  </form>
+</div>
+
+{% if target and snap %}
+<div class="card">
+  <h2>👤 {{ target.username }} <span class="pill {% if target.is_admin %}pill-gold{% endif %}">{% if target.is_admin %}관리자{% else %}일반{% endif %}</span>
+    <span class="muted" style="font-size:.8rem">#{{ target.id }} · 가입 {{ target.created_at|int }}</span></h2>
+
+  <div class="grid">
+    <div class="stat"><div class="label">💵 소지금</div><div class="value gold">{{ (snap.money.balance if snap.money else 0)|fmt }}원</div></div>
+    <div class="stat"><div class="label">🏦 예치금</div><div class="value">{{ (snap.bank.balance if snap.bank else 0)|fmt }}원</div></div>
+    <div class="stat"><div class="label">💳 대출</div><div class="value red">{{ (snap.loan.principal + snap.loan.interest if snap.loan else 0)|fmt }}원</div></div>
+    <div class="stat"><div class="label">🎫 로또 티켓</div><div class="value">{% if snap.ticket %}{{ "%03d" % snap.ticket.number }}{% else %}-{% endif %}</div></div>
+    <div class="stat"><div class="label">🎩 하이롤러</div><div class="value">Lv.{{ snap.hr.level if snap.hr else 0 }}</div></div>
+    <div class="stat"><div class="label">🌠 소망력 대기</div><div class="value">{{ snap.hope.count if snap.hope else 0 }}개</div></div>
+  </div>
+
+  {% if snap.job %}
+  <p style="margin:10px 0"><b>💼 직업:</b> {{ snap.job.job_id }} · Lv.{{ snap.job.level }} · 누적 근무 {{ snap.job.work_count }}회</p>
+  {% endif %}
+
+  <div class="grid">
+    <div class="card">
+      <h3>📈 주식</h3>
+      {% if snap.stocks %}
+      <table><thead><tr><th>종목</th><th>수량</th><th>평단</th></tr></thead><tbody>
+        {% for s in snap.stocks %}<tr><td>{{ s.ticker }}</td><td>{{ s.quantity }}</td><td>{{ s.avg_price|fmt }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="muted" style="font-size:.85rem">보유 없음</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>💱 외환</h3>
+      {% if snap.fx %}
+      <table><thead><tr><th>통화</th><th>보유</th><th>평단</th></tr></thead><tbody>
+        {% for f in snap.fx %}<tr><td>{{ f.code }}</td><td>{{ "%.2f"|format(f.amount_cents/100) }}</td><td>{{ (f.avg_cost_cents/100)|fmt }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="muted" style="font-size:.85rem">보유 없음</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>🏢 부동산</h3>
+      {% if snap.props %}
+      <table><thead><tr><th>유형</th><th>레벨</th><th>직원</th></tr></thead><tbody>
+        {% for p in snap.props %}<tr><td>{{ p.type_id }}</td><td>{{ p.level }}</td><td>{% if p.staff_man %}관리{{ p.staff_man }} {% endif %}{% if p.staff_guard %}경비{{ p.staff_guard }} {% endif %}{% if p.staff_promo %}홍보{{ p.staff_promo }}{% endif %}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="muted" style="font-size:.85rem">보유 없음</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>🎒 인벤토리</h3>
+      {% if snap.inv %}
+      <table><thead><tr><th>아이템</th><th>수량</th></tr></thead><tbody>
+        {% for i in snap.inv %}<tr><td>{{ i.item_id }}</td><td>{{ i.quantity }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="muted" style="font-size:.85rem">없음</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>⏱️ 스탯 / 쿨다운</h3>
+      {% if snap.stats %}
+      <table><thead><tr><th>키</th><th>값</th></tr></thead><tbody>
+        {% for s in snap.stats %}<tr><td style="font-size:.8rem">{{ s.stat }}</td><td>{{ s.value }}</td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="muted" style="font-size:.85rem">없음</p>{% endif %}
+    </div>
+    <div class="card">
+      <h3>🏅 업적 {{ snap.achs|length }}개</h3>
+      {% if snap.achs %}
+      <p class="muted" style="font-size:.85rem">{% for a in snap.achs %}{{ ACHIEVEMENTS.get(a.achievement_id, (a.achievement_id,))[0] }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      {% else %}<p class="muted" style="font-size:.85rem">없음</p>{% endif %}
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--border-soft);margin:18px 0">
+
+  <h3 style="margin-bottom:12px">🛠️ 액션</h3>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr));align-items:start">
+    <form method="post" action="/admin/cash" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>💵 소지금 설정</h3>
+      <div class="form-row"><input name="amount" type="number" min="0" placeholder="금액" required><button class="btn-sm btn-gold">설정</button></div>
+    </form>
+    <form method="post" action="/admin/add_cash" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>💰 소지금 증감</h3>
+      <div class="form-row"><input name="delta" type="number" placeholder="± 금액" required><button class="btn-sm">적용</button></div>
+    </form>
+    <form method="post" action="/admin/deposit" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>🏦 예치금 설정</h3>
+      <div class="form-row"><input name="amount" type="number" min="0" placeholder="금액" required><button class="btn-sm">설정</button></div>
+    </form>
+    <form method="post" action="/admin/loan" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>💳 대출 설정</h3>
+      <div class="form-row"><input name="amount" type="number" min="0" placeholder="원금" required><button class="btn-sm">설정</button></div>
+    </form>
+    <form method="post" action="/admin/item" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>🎁 아이템 지급</h3>
+      <div class="form-row">
+        <input name="item_id" value="hope" list="item-ids" style="width:110px">
+        <datalist id="item-ids">{% for i in ITEM_IDS %}<option value="{{ i }}">{% endfor %}</datalist>
+        <input name="qty" type="number" min="1" value="1" style="width:70px">
+        <button class="btn-sm btn-green">지급</button>
+      </div>
+    </form>
+    <form method="post" action="/admin/stock" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>📈 주식 지급</h3>
+      <div class="form-row">
+        <input name="ticker" list="tickers" placeholder="KLRE" style="width:90px">
+        <datalist id="tickers">{% for t in STOCK_TICKERS %}<option value="{{ t }}">{% endfor %}</datalist>
+        <input name="qty" type="number" min="1" placeholder="수량" style="width:80px" required>
+        <input name="avg_price" type="number" min="0" placeholder="평단" style="width:90px">
+        <button class="btn-sm btn-green">지급</button>
+      </div>
+    </form>
+    <form method="post" action="/admin/clear_cd" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>⏱️ 쿨다운 해제</h3>
+      <button class="btn-sm">모든 쿨다운 해제</button>
+    </form>
+    <form method="post" action="/admin/set_admin" class="card" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3>🛡️ 관리자 권한</h3>
+      <div class="form-row">
+        <select name="make" style="flex:1">
+          <option value="1">관리자로 승격</option>
+          <option value="0">관리자 해제</option>
+        </select>
+        <button class="btn-sm btn-gold">적용</button>
+      </div>
+    </form>
+    <form method="post" action="/admin/reset" class="card" style="margin:0" onsubmit="return confirm('정말 이 유저의 경제 데이터를 초기화하나요?');">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3 style="color:var(--red)">🧹 경제 초기화</h3>
+      <p class="muted" style="font-size:.8rem;margin-bottom:8px">돈/은행/주식/부동산/아이템/직업/스탯 삭제 (계정·업적 유지)</p>
+      <button class="btn-sm btn-red">초기화</button>
+    </form>
+    <form method="post" action="/admin/delete" class="card" style="margin:0;border-color:var(--red)">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="uid" value="{{ target.id }}">
+      <h3 style="color:var(--red)">🗑️ 계정 삭제</h3>
+      <p class="muted" style="font-size:.8rem;margin-bottom:8px">복구 불가. 확인란에 <b>삭제</b> 입력</p>
+      <div class="form-row"><input name="confirm" placeholder="삭제" style="width:90px"><button class="btn-sm btn-red">삭제</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>📋 전체 유저 ({{ user_rows|length }}명)</h2>
+  <table>
+    <thead><tr><th>#</th><th>아이디</th><th>소지금</th><th>권한</th><th>가입일</th><th></th></tr></thead>
+    <tbody>
+      {% for r in user_rows %}
+      <tr>
+        <td>{{ r.user.id }}</td>
+        <td><b>{{ r.user.username }}</b></td>
+        <td>{{ r.cash|fmt }}원</td>
+        <td>{% if r.user.is_admin %}<span class="pill pill-gold">관리자</span>{% else %}<span class="pill">일반</span>{% endif %}</td>
+        <td class="muted" style="font-size:.8rem">{{ r.user.created_at|int }}</td>
+        <td><a class="btn btn-sm" href="/admin?q={{ r.user.username }}">관리</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>🎫 로또 컨트롤</h2>
+  <p class="muted" style="font-size:.85rem;margin-bottom:8px">현재 잭팟 <b class="gold">{{ lotto.jackpot|fmt }}원</b> · 추첨 {{ lotto.draw_count }}회 · 최근 번호 {% if lotto.last_drawn %}{{ "%03d" % lotto.last_drawn }}{% else %}-{% endif %}</p>
+  <div class="form-row">
+    <form method="post" action="/admin/lotto" class="form-row" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="action" value="set">
+      <input name="amount" type="number" min="0" placeholder="잭팟 금액" required>
+      <button class="btn-sm btn-gold">잭팟 설정</button>
+    </form>
+    <form method="post" action="/admin/lotto" class="form-row" style="margin:0">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="action" value="draw">
+      <button class="btn-sm" onclick="return confirm('지금 로또 추첨을 강제로 실행하나요?');">🎲 강제 추첨</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

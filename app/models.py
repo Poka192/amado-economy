@@ -3,6 +3,7 @@ import time
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Float,
     ForeignKey,
     Integer,
@@ -30,6 +31,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[float] = mapped_column(Float, default=_now)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class SystemState(Base):
