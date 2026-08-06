@@ -2,6 +2,7 @@
 import time
 
 from sqlalchemy import (
+    BigInteger,
     Float,
     ForeignKey,
     Integer,
@@ -45,7 +46,7 @@ class Money(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    balance: Mapped[int] = mapped_column(Integer, default=5000)
+    balance: Mapped[int] = mapped_column(BigInteger, default=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +59,7 @@ class BankAccount(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    balance: Mapped[int] = mapped_column(Integer, default=0)
+    balance: Mapped[int] = mapped_column(BigInteger, default=0)
     last_interest_at: Mapped[float] = mapped_column(Float, default=_now)
 
 
@@ -68,8 +69,8 @@ class BankLoan(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
-    principal: Mapped[int] = mapped_column(Integer, default=0)
-    interest: Mapped[int] = mapped_column(Integer, default=0)
+    principal: Mapped[int] = mapped_column(BigInteger, default=0)
+    interest: Mapped[int] = mapped_column(BigInteger, default=0)
     last_interest_at: Mapped[float] = mapped_column(Float, default=_now)
 
 
@@ -178,7 +179,7 @@ class LottoState(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     last_drawn: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_draw_time: Mapped[float] = mapped_column(Float, default=0)
-    jackpot: Mapped[int] = mapped_column(Integer, default=0)
+    jackpot: Mapped[int] = mapped_column(BigInteger, default=0)
     draw_count: Mapped[int] = mapped_column(Integer, default=0)
 
 

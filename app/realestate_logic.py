@@ -49,7 +49,18 @@ def _now() -> float:
     return time.time()
 
 
+# 프로세스당 1회만 시장 존재 확인 (원격 DB 왕복 절약)
+_seeded_engines: set[int] = set()
+
+
+def _is_seeded(db: Session) -> bool:
+    return id(db.get_bind()) in _seeded_engines
+
+
 def ensure_market(db: Session):
+    """시장 시드: 종목 미존재 시 기준가로 생성. (1회만 검사)"""
+    if _is_seeded(db):
+        return
     rows = db.execute(select(PropertyMarket)).scalars().all()
     have = {r.type_id for r in rows}
     for tid, _name, base, _rent, _maint in PROPERTY_TYPES:
@@ -60,6 +71,7 @@ def ensure_market(db: Session):
     if state is None:
         db.add(PropertyState(id=1, last_tick_time=_now()))
     db.flush()
+    _seeded_engines.add(id(db.get_bind()))
 
 
 def get_market_prices(db: Session) -> dict[str, int]:

@@ -67,8 +67,18 @@ def _sigma(code: str) -> float:
     return FX_SIGMA
 
 
+# 프로세스당 1회만 시드 존재 확인 (원격 DB 왕복 절약)
+_seeded_engines: set[int] = set()
+
+
+def _is_seeded(db: Session) -> bool:
+    return id(db.get_bind()) in _seeded_engines
+
+
 def ensure_seed(db: Session):
-    """시드: 통화 미존재 시 기준 환율로 생성."""
+    """시드: 통화 미존재 시 기준 환율로 생성. (1회만 검사)"""
+    if _is_seeded(db):
+        return
     existing = db.execute(select(FxRate.code)).scalars().all()
     have = set(existing)
     for code, name, base, _sig in FX_CURRENCIES:
@@ -79,6 +89,7 @@ def ensure_seed(db: Session):
     db.flush()
     if state_get(db, "fx_last_tick") == 0:
         state_set(db, "fx_last_tick", _now())
+    _seeded_engines.add(id(db.get_bind()))
 
 
 def _simulate_tick(rates: dict[str, FxRate]):
@@ -116,7 +127,7 @@ def catch_up(db: Session) -> int:
         db.add(FxHistory(code=row.code, rate=row.rate, ts=now))
     db.flush()
     state_set(db, "fx_last_tick", now)
-    db.flush()
+    db.commit()  # 환율 진행 확정 (GET 접근 시에도 반복 실행 방지)
     return ticks
 
 

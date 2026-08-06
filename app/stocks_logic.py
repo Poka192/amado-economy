@@ -5,7 +5,7 @@ import math
 import random
 import time
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from . import achievements as ach
@@ -54,8 +54,18 @@ def state_set(db: Session, key: str, val: float):
     db.flush()
 
 
+# 프로세스당 1회만 시드 존재 확인 (원격 DB 왕복 절약)
+_seeded_engines: set[int] = set()
+
+
+def _is_seeded(db: Session) -> bool:
+    return id(db.get_bind()) in _seeded_engines
+
+
 def ensure_seed(db: Session):
-    """시드: 종목 미존재 시 기준가로 생성."""
+    """시드: 종목 미존재 시 기준가로 생성. (1회만 검사)"""
+    if _is_seeded(db):
+        return
     existing = db.execute(select(StockPrice.ticker)).scalars().all()
     have = set(existing)
     for name, code, base, *_ in STOCKS:
@@ -66,6 +76,7 @@ def ensure_seed(db: Session):
     db.flush()
     if state_get(db, "stock_last_tick") == 0:
         state_set(db, "stock_last_tick", _now())
+    _seeded_engines.add(id(db.get_bind()))
 
 
 def get_prices(db: Session) -> dict[str, dict]:
@@ -101,9 +112,16 @@ def _maybe_news(db: Session, now: float):
 
 
 def _trim_history(db: Session):
-    """종목별 히스토리 상한 유지 — 종목당 쿼리 1회로 경량화."""
+    """종목별 히스토리 상한 유지 — 상한 초과 종목만 정리."""
+    over = db.execute(
+        select(StockHistory.ticker)
+        .group_by(StockHistory.ticker)
+        .having(func.count(StockHistory.id) > HISTORY_LIMIT * 2)
+    ).scalars().all()
+    if not over:
+        return
     keep = HISTORY_LIMIT * 2
-    for ticker in db.execute(select(StockPrice.ticker)).scalars().all():
+    for ticker in over:
         db.execute(
             StockHistory.__table__.delete().where(
                 StockHistory.ticker == ticker,
@@ -160,7 +178,7 @@ def catch_up(db: Session):
         _maybe_news(db, now)
 
     state_set(db, "stock_last_tick", now)
-    db.flush()
+    db.commit()  # 시장 진행을 확정 (GET 접근 시에도 반복 실행 방지)
     return ticks
 
 
