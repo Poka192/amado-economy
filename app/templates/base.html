@@ -6,8 +6,18 @@
   <meta name="theme-color" content="#07070c">
   <meta name="description" content="아마도 경제 — 은행·알바·카지노·로또·주식·부동산을 즐기는 웹 경제 게임">
   <title>{% block title %}아마도 경제{% endblock %}</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
   <link rel="stylesheet" href="/static/style.css">
-  <script>document.documentElement.className += ' js';</script>
+  <script>
+    document.documentElement.className += ' js';
+    // 저장된 테마 복원 (깜빡임 없이 paint 전 적용)
+    try {
+      var t = localStorage.getItem('theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <!-- CSS-only 햄버거: 체크박스가 sidebar 토글 상태를 관리 -->
@@ -72,6 +82,17 @@
         <p class="muted" style="font-size:.78rem">아마도 경제에 오신 것을 환영합니다</p>
       </div>
     {% endif %}
+
+    <!-- 테마 스위처 (공통) -->
+    <div class="theme-block">
+      <div class="sidebar-section-title">테마</div>
+      <div class="theme-switcher">
+        <button type="button" class="theme-opt" data-theme="vault"><span class="swatch vault"></span>볼트</button>
+        <button type="button" class="theme-opt" data-theme="midnight"><span class="swatch midnight"></span>미드</button>
+        <button type="button" class="theme-opt" data-theme="emerald"><span class="swatch emerald"></span>에메랄드</button>
+        <button type="button" class="theme-opt" data-theme="paper"><span class="swatch paper"></span>페이퍼</button>
+      </div>
+    </div>
   </aside>
 
   <!-- 모바일 오버레이 (사이드바 배경 클릭 시 닫힘) -->
