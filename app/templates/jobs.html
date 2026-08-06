@@ -5,12 +5,10 @@
   <h2>💼 직업 목록</h2>
   {% if my_job %}
     {% set job = jobs | selectattr('0', 'equalto', my_job.job_id) | first %}
-    <p>현재 직업: <b class="gold">{{ job[1] }}</b> · 레벨 <b>{{ my_job.level }}</b></p>
-    <div class="form-row" style="margin-top:10px">
-      <form method="post" action="/jobs/work">
-        {% if work_left > 0 %}<button disabled class="btn-sm">출근 쿨다운 {{ work_left|int }}초</button>
-        {% else %}<button class="btn-green">출근하기</button>{% endif %}
-      </form>
+    <p>현재 직업: <b class="gold">{{ job[1] }}</b> · 레벨 <b class="js-level" data-raw="{{ my_job.level }}">Lv.{{ my_job.level }}</b></p>
+    <div class="cd-box" data-cd="{{ work_left|int }}" data-action="/jobs/work" data-label="출근하기" data-color="btn-green">
+      {% if work_left > 0 %}<button disabled class="btn-sm">출근 쿨다운 <span class="cd-sec">{{ work_left|int }}</span>초</button>
+      {% else %}<form method="post" action="/jobs/work" class="ajax-form"><button class="btn-green">출근하기</button></form>{% endif %}
     </div>
   {% else %}
     <p class="muted">직업을 선택하고 출근해서 월급을 받으세요. (5분 쿨다운)</p>

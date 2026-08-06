@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import random
+import time as _time
 
 from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,14 +17,27 @@ from ..config import LOAN_MIN
 from ..database import get_db
 from ..deps import require_user
 from ..main import redirect, render
-from ..models import Property, User, UserJob
+from ..models import BankAccount, BankLoan, Property, User, UserJob
 
 router = APIRouter()
 
 
+def _wants_json(request: Request) -> bool:
+    """AJAX 폼(fetch)은 Accept: application/json 을 보낸다."""
+    return "application/json" in request.headers.get("accept", "")
+
+
 def _net_worth(db: Session, uid: int) -> dict:
-    deposit, loan_p, loan_i = logic.bank_settle(db, uid)
-    loan_debt = loan_p + loan_i
+    # GET에서 이자를 실제로 기입(bank_settle)하지 않고 순수 계산만 한다.
+    # (이자 반영 시점은 다음 액션의 commit으로 미뤄진다 — 표시값은 동일)
+    now = _time.time()
+    acc = db.get(BankAccount, uid)
+    deposit = logic.accrued_deposit(acc.balance, acc.last_interest_at, now) if acc else 0
+    loan = db.get(BankLoan, uid)
+    loan_debt = 0
+    if loan is not None:
+        p, i = logic.accrued_loan(loan.principal, loan.interest, loan.last_interest_at, now)
+        loan_debt = p + i
     cash = logic.get_money(db, uid)
 
     prices = {t: v["price"] for t, v in st_logic.get_prices(db).items()}
@@ -74,6 +89,9 @@ async def beg(request: Request, db: Session = Depends(get_db),
               user: User = Depends(require_user)):
     left = logic.cd_remaining(db, user.id, "cd_beg", 10)
     if left > 0:
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "msg": f"구걸 쿨다운 {left:.0f}초",
+                                 "cash": logic.get_money(db, user.id), "beg_left": left})
         return redirect("/dashboard", err=f"구걸 쿨다운 {left:.0f}초")
     logic.cd_set(db, user.id, "cd_beg")
     amount = random.randint(-50_000, 25_000)
@@ -84,7 +102,10 @@ async def beg(request: Request, db: Session = Depends(get_db),
     db.commit()
     msg = f"{amount:,}원 획득! (잔고 {new_balance:,}원)" if amount >= 0 else \
         f"{amount:,}원 잃음! (잔고 {new_balance:,}원)"
-    return redirect("/dashboard", msg=f"🦹 구걸 결과: {msg}")
+    msg = f"🦹 구걸 결과: {msg}"
+    if _wants_json(request):
+        return JSONResponse({"ok": True, "msg": msg, "cash": new_balance, "beg_left": 10})
+    return redirect("/dashboard", msg=msg)
 
 
 @router.post("/alba")
@@ -92,6 +113,9 @@ async def alba(request: Request, db: Session = Depends(get_db),
                user: User = Depends(require_user)):
     left = logic.cd_remaining(db, user.id, "cd_alba", 300)
     if left > 0:
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "msg": f"알바 쿨다운 {left:.0f}초",
+                                 "cash": logic.get_money(db, user.id), "alba_left": left})
         return redirect("/dashboard", err=f"알바 쿨다운 {left:.0f}초")
     logic.cd_set(db, user.id, "cd_alba")
     job = random.choice(["🍞 편의점", "☕ 카페", "🍔 패스트푸드", "🍕 피자집", "📦 택배",
@@ -105,7 +129,10 @@ async def alba(request: Request, db: Session = Depends(get_db),
     if count >= 50:
         ach.grant(db, user.id, "alba_50")
     db.commit()
-    return redirect("/dashboard", msg=f"💼 {job} 알바 완료! +{wage:,}원 (잔고 {new_balance:,}원)")
+    msg = f"💼 {job} 알바 완료! +{wage:,}원 (잔고 {new_balance:,}원)"
+    if _wants_json(request):
+        return JSONResponse({"ok": True, "msg": msg, "cash": new_balance, "alba_left": 300})
+    return redirect("/dashboard", msg=msg)
 
 
 # ---------------------------------------------------------------------------
@@ -270,9 +297,15 @@ async def job_work(request: Request, db: Session = Depends(get_db),
                    user: User = Depends(require_user)):
     left = logic.cd_remaining(db, user.id, "cd_work", 300)
     if left > 0:
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "msg": f"출근 쿨다운 {left:.0f}초",
+                                 "cash": logic.get_money(db, user.id), "work_left": left})
         return redirect("/jobs", err=f"출근 쿨다운 {left:.0f}초")
     result = logic.work_job(db, user.id)
     if result[0] is None:
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "msg": "직업을 먼저 선택하세요.",
+                                 "cash": logic.get_money(db, user.id), "work_left": 0})
         return redirect("/jobs", err="직업을 먼저 선택하세요.")
     salary, leveled_up, next_level, level = result
     logic.cd_set(db, user.id, "cd_work")
@@ -281,6 +314,10 @@ async def job_work(request: Request, db: Session = Depends(get_db),
     if leveled_up:
         msg += f" 🎉 Lv.{level} 레벨업!"
     db.commit()
+    if _wants_json(request):
+        return JSONResponse({"ok": True, "msg": msg, "cash": logic.get_money(db, user.id),
+                             "work_left": 300, "level": level,
+                             "leveled_up": leveled_up})
     return redirect("/jobs", msg=msg)
 
 

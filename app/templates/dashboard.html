@@ -8,8 +8,8 @@
 
 <div class="net-worth">
   <div class="nw-label">💰 전재산</div>
-  <div class="nw-value">{{ worth.total|fmt }}원</div>
-  <div class="nw-sub">소지금 {{ worth.cash|fmt }}원 · 예치 {{ worth.deposit|fmt }}원 · 대출 {{ worth.loan|fmt }}원</div>
+  <div class="nw-value js-total" data-raw="{{ worth.total }}">{{ worth.total|fmt }}원</div>
+  <div class="nw-sub">소지금 <b class="js-cash" data-raw="{{ worth.cash }}">{{ worth.cash|fmt }}원</b> · 예치 {{ worth.deposit|fmt }}원 · 대출 {{ worth.loan|fmt }}원</div>
 </div>
 
 <div class="grid">
@@ -17,7 +17,7 @@
     <div class="asset-icon">💵</div>
     <div class="asset-info">
       <div class="asset-label">소지금</div>
-      <div class="asset-value gold">{{ worth.cash|fmt }}원</div>
+      <div class="asset-value gold js-cash" data-raw="{{ worth.cash }}">{{ worth.cash|fmt }}원</div>
     </div>
   </div>
   <div class="asset-card">
@@ -58,21 +58,25 @@
     <div class="action-icon">🦹</div>
     <div class="action-label">구걸</div>
     <div class="action-desc">-50,000 ~ +25,000원 · 10초 쿨다운</div>
-    {% if beg_left > 0 %}
-      <button class="btn btn-sm" disabled>쿨다운 {{ beg_left|int }}초</button>
-    {% else %}
-      <form method="post" action="/beg"><button class="btn btn-gold">구걸하기</button></form>
-    {% endif %}
+    <div class="cd-box" data-cd="{{ beg_left|int }}" data-action="/beg" data-label="구걸하기" data-color="btn-gold">
+      {% if beg_left > 0 %}
+        <button class="btn btn-sm" disabled>쿨다운 <span class="cd-sec">{{ beg_left|int }}</span>초</button>
+      {% else %}
+        <form method="post" action="/beg" class="ajax-form"><button class="btn btn-gold">구걸하기</button></form>
+      {% endif %}
+    </div>
   </div>
   <div class="card action-card">
     <div class="action-icon">💼</div>
     <div class="action-label">알바</div>
     <div class="action-desc">+10,000 ~ +50,000원 · 5분 쿨다운</div>
-    {% if alba_left > 0 %}
-      <button class="btn btn-sm" disabled>쿨다운 {{ alba_left|int }}초</button>
-    {% else %}
-      <form method="post" action="/alba"><button class="btn btn-green">알바하기</button></form>
-    {% endif %}
+    <div class="cd-box" data-cd="{{ alba_left|int }}" data-action="/alba" data-label="알바하기" data-color="btn-green">
+      {% if alba_left > 0 %}
+        <button class="btn btn-sm" disabled>쿨다운 <span class="cd-sec">{{ alba_left|int }}</span>초</button>
+      {% else %}
+        <form method="post" action="/alba" class="ajax-form"><button class="btn btn-green">알바하기</button></form>
+      {% endif %}
+    </div>
   </div>
 </div>
 
