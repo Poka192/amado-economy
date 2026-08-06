@@ -68,21 +68,12 @@ def get_market_prices(db: Session) -> dict[str, int]:
     return {r.type_id: r.price for r in rows}
 
 
-def _market_tick(db: Session, now: float):
-    """모든 종목 가격 갱신 (평균회귀 + 랜덤, 기준가 70~160% 클램프)."""
-    market_shock = random.gauss(0, RE_MARKET_SIGMA)
-    for row in db.execute(select(PropertyMarket)).scalars().all():
-        tid, base = PROPERTY_MAP[row.type_id][0], PROPERTY_MAP[row.type_id][2]
-        drift = MEAN_REVERSION_RE * ((base - row.price) / base)
-        pct = market_shock + random.gauss(0, RE_MARKET_SIGMA) + drift
-        pct = max(-MAX_TICK_MOVE_RE, min(MAX_TICK_MOVE_RE, pct))
-        new_price = int(round(row.price * math.exp(pct)))
-        row.price = max(int(base * PRICE_MIN_RATIO), min(int(base * PRICE_MAX_RATIO), new_price))
-    db.flush()
-
-
 def catch_up(db: Session):
-    """오프라인 시간 보정 (가격 틱 + 임대 정산)."""
+    """오프라인 시간 보정 (가격 틱 + 임대 정산).
+
+    원격 DB에서는 틱마다 SELECT하면 왕복이 쌓이므로, 가격행을 한 번만
+    로드해 메모리에서 틱을 진행하고 최종 상태만 기록한다.
+    """
     ensure_market(db)
     state = db.get(PropertyState, 1)
     last = state.last_tick_time if state else _now()
@@ -90,8 +81,18 @@ def catch_up(db: Session):
     elapsed = now - last
     if elapsed >= 600:
         missed = min(int(elapsed / 600), MAX_CATCHUP_TICKS)
+        rows = {r.type_id: r for r in db.execute(select(PropertyMarket)).scalars().all()}
         for _ in range(missed):
-            _market_tick(db, now)
+            market_shock = random.gauss(0, RE_MARKET_SIGMA)
+            for tid, row in rows.items():
+                base = PROPERTY_MAP[tid][2]
+                drift = MEAN_REVERSION_RE * ((base - row.price) / base)
+                pct = market_shock + random.gauss(0, RE_MARKET_SIGMA) + drift
+                pct = max(-MAX_TICK_MOVE_RE, min(MAX_TICK_MOVE_RE, pct))
+                new_price = int(round(row.price * math.exp(pct)))
+                row.price = max(int(base * PRICE_MIN_RATIO),
+                                min(int(base * PRICE_MAX_RATIO), new_price))
+        db.flush()
     # 임대 정산
     for owner in db.execute(select(Property.owner_id).distinct()).scalars().all():
         _settle_owner(db, owner, now)

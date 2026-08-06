@@ -5,7 +5,7 @@ import math
 import random
 import time
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import achievements as ach
@@ -79,25 +79,6 @@ def _round_to_step(price: int) -> int:
     return max(100, int(round(price / step)) * step)
 
 
-def _tick_once(db: Session, now: float):
-    """1틱 가격 변동 (장 항상 개장)."""
-    market_shock = random.gauss(0, MARKET_SIGMA)
-    for row in db.execute(select(StockPrice)).scalars().all():
-        base = next((b for _, c, b, *_ in STOCKS if c == row.ticker), row.price)
-        drift = MEAN_REVERSION_DRIFT * ((base - row.price) / base) if base else 0.0
-        pct = beta_of(row.ticker) * market_shock + random.gauss(0, sigma_of(row.ticker)) + drift
-        pct = max(-MAX_TICK_MOVE, min(MAX_TICK_MOVE, pct))
-        new_price = _round_to_step(max(100, int(round(row.price * math.exp(pct)))))
-        row.price = new_price
-        db.add(StockHistory(ticker=row.ticker, price=new_price, ts=now))
-    db.flush()
-    # 히스토리 트림
-    _trim_history(db)
-    # 뉴스
-    if random.random() < NEWS_PER_TICK:
-        _maybe_news(db, now)
-
-
 def beta_of(ticker: str) -> float:
     return next((b for _, c, _b, _s, b, _sec, _d in STOCKS if c == ticker), 1.0)
 
@@ -120,23 +101,30 @@ def _maybe_news(db: Session, now: float):
 
 
 def _trim_history(db: Session):
-    # 종목별 히스토리 상한 유지 (최신 HISTORY_LIMIT개)
+    """종목별 히스토리 상한 유지 — 종목당 쿼리 1회로 경량화."""
+    keep = HISTORY_LIMIT * 2
     for ticker in db.execute(select(StockPrice.ticker)).scalars().all():
-        count = db.execute(
-            select(func.count()).select_from(StockHistory).where(StockHistory.ticker == ticker)
-        ).scalar()
-        if count and count > HISTORY_LIMIT * 2:
-            ids = db.execute(
-                select(StockHistory.id).where(StockHistory.ticker == ticker)
-                .order_by(StockHistory.id).limit(count - HISTORY_LIMIT)
-            ).scalars().all()
-            for i in ids:
-                db.delete(db.get(StockHistory, i))
+        db.execute(
+            StockHistory.__table__.delete().where(
+                StockHistory.ticker == ticker,
+                StockHistory.id.in_(
+                    select(StockHistory.id)
+                    .where(StockHistory.ticker == ticker)
+                    .order_by(StockHistory.id.desc())
+                    .offset(keep)
+                ),
+            )
+        )
     db.flush()
 
 
 def catch_up(db: Session):
-    """접근 시 오프라인 시간 보정 (최대 1000틱)."""
+    """접근 시 오프라인 시간 보정 (최대 MAX_CATCHUP_TICKS).
+
+    원격 DB(예: Supabase)에서는 틱마다 쓰면 수천 번 왕복이 되어
+    요청이 수 분간 막히므로, 전체 틱을 메모리에서 시뮬레이션하고
+    최종 가격만 한 번에 기록한다. 지정가 주문/배당은 최종 가격 기준으로 처리.
+    """
     ensure_seed(db)
     last = state_get(db, "stock_last_tick")
     now = _now()
@@ -144,17 +132,35 @@ def catch_up(db: Session):
     if elapsed < STOCK_TICK_SECONDS:
         return 0
     ticks = min(int(elapsed / STOCK_TICK_SECONDS), MAX_CATCHUP_TICKS)
-    sim_now = last
-    tick_count = 0
-    for i in range(ticks):
-        sim_now = last + (i + 1) * STOCK_TICK_SECONDS
-        _tick_once(db, sim_now)
-        tick_count += 1
-        if tick_count % DIVIDEND_EVERY_TICKS == 0:
-            _pay_dividends(db, sim_now)
-        _check_orders(db, sim_now)
+
+    # 메모리에서 전체 틱 시뮬레이션
+    rows = {r.ticker: r for r in db.execute(select(StockPrice)).scalars().all()}
+    for _ in range(ticks):
+        market_shock = random.gauss(0, MARKET_SIGMA)
+        for ticker, row in rows.items():
+            base = next((b for _, c, b, *_ in STOCKS if c == ticker), row.price)
+            drift = MEAN_REVERSION_DRIFT * ((base - row.price) / base) if base else 0.0
+            pct = beta_of(ticker) * market_shock + random.gauss(0, sigma_of(ticker)) + drift
+            pct = max(-MAX_TICK_MOVE, min(MAX_TICK_MOVE, pct))
+            row.price = _round_to_step(max(100, int(round(row.price * math.exp(pct)))))
+
+    # 최종 가격 히스토리 1건씩 기록
+    for ticker, row in rows.items():
+        db.add(StockHistory(ticker=ticker, price=row.price, ts=now))
+    db.flush()
+    _trim_history(db)
+
+    # 지정가 주문 체결 + 배당 (최종 상태 기준)
+    _check_orders(db, now)
+    for _ in range(ticks // DIVIDEND_EVERY_TICKS):
+        _pay_dividends(db, now)
+
+    # 뉴스 (틱 수에 비례한 확률로 최대 1건)
+    if random.random() < min(1.0, NEWS_PER_TICK * ticks):
+        _maybe_news(db, now)
+
     state_set(db, "stock_last_tick", now)
-    db.commit()
+    db.flush()
     return ticks
 
 

@@ -21,7 +21,6 @@ from .defs import (
     FX_MIN_EXCHANGE_KRW,
     FX_SIGMA,
     FX_TICK_SECONDS,
-    HISTORY_LIMIT_FX,
     MAX_CATCHUP_TICKS_FX,
     MAX_TICK_MOVE_FX,
     MEAN_REVERSION_FX,
@@ -82,40 +81,25 @@ def ensure_seed(db: Session):
         state_set(db, "fx_last_tick", _now())
 
 
-def _tick_once(db: Session, now: float):
-    """1틱 환율 변동 (장 항상 개장). 기준가로 평균회귀 + 무작위 변동."""
-    for row in db.execute(select(FxRate)).scalars().all():
-        base = _base_rate(row.code)
+def _simulate_tick(rates: dict[str, FxRate]):
+    """환율 1틱 메모리 변동 (DB 쓰기 없음)."""
+    for code, row in rates.items():
+        base = _base_rate(code)
         if base <= 0:
             continue
         drift = MEAN_REVERSION_FX * ((base - row.rate) / base)
-        pct = random.gauss(0, _sigma(row.code)) + drift
+        pct = random.gauss(0, _sigma(code)) + drift
         pct = max(-MAX_TICK_MOVE_FX, min(MAX_TICK_MOVE_FX, pct))
-        new_rate = max(1, int(round(row.rate * math.exp(pct))))
-        row.rate = new_rate
-        db.add(FxHistory(code=row.code, rate=new_rate, ts=now))
-    db.flush()
-    _trim_history(db)
-
-
-def _trim_history(db: Session):
-    """통화별 가격기록 상한 유지."""
-    for code in [c for c, *_ in FX_CURRENCIES]:
-        ids = db.execute(
-            select(FxHistory.id)
-            .where(FxHistory.code == code)
-            .order_by(FxHistory.id.desc())
-            .offset(HISTORY_LIMIT_FX * 2)
-        ).scalars().all()
-        if ids:
-            db.execute(
-                FxHistory.__table__.delete().where(FxHistory.id.in_(ids))
-            )
-    db.flush()
+        row.rate = max(1, int(round(row.rate * math.exp(pct))))
 
 
 def catch_up(db: Session) -> int:
-    """접근 시 오프라인 시간 보정. 실행한 틱 수 반환."""
+    """접근 시 오프라인 시간 보정. 실행한 틱 수 반환.
+
+    원격 DB(예: Supabase)에서는 틱마다 쓰면 수천 번 왕복이 되어
+    요청이 수 분간 막히므로, 전체 틱을 메모리에서 시뮬레이션하고
+    최종 환율만 한 번에 기록한다.
+    """
     ensure_seed(db)
     last = state_get(db, "fx_last_tick")
     now = _now()
@@ -125,8 +109,12 @@ def catch_up(db: Session) -> int:
     if elapsed < FX_TICK_SECONDS:
         return 0
     ticks = min(int(elapsed / FX_TICK_SECONDS), MAX_CATCHUP_TICKS_FX)
-    for _i in range(ticks):
-        _tick_once(db, now)
+    rates = {r.code: r for r in db.execute(select(FxRate)).scalars().all()}
+    for _ in range(ticks):
+        _simulate_tick(rates)
+    for row in rates.values():
+        db.add(FxHistory(code=row.code, rate=row.rate, ts=now))
+    db.flush()
     state_set(db, "fx_last_tick", now)
     db.flush()
     return ticks
